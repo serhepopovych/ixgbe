@@ -8743,6 +8743,15 @@ static inline int ixgbe_maybe_stop_tx(struct ixgbe_ring *tx_ring, u16 size)
 	return __ixgbe_maybe_stop_tx(tx_ring, size);
 }
 
+static inline bool ixgbe_xmit_more(const struct sk_buff *skb)
+{
+#ifdef HAVE_SKB_XMIT_MORE
+	return skb->xmit_more;
+#else
+	return 0;
+#endif
+}
+
 #define IXGBE_TXD_CMD (IXGBE_TXD_CMD_EOP | \
 		       IXGBE_TXD_CMD_RS)
 
@@ -8869,8 +8878,7 @@ static int ixgbe_tx_map(struct ixgbe_ring *tx_ring,
 
 	ixgbe_maybe_stop_tx(tx_ring, DESC_NEEDED);
 
-#ifdef HAVE_SKB_XMIT_MORE
-	if (netif_xmit_stopped(txring_txq(tx_ring)) || !skb->xmit_more) {
+	if (netif_xmit_stopped(txring_txq(tx_ring)) || !ixgbe_xmit_more(skb)) {
 		writel(i, tx_ring->tail);
 
 		/* we need this if more than one processor can write to our tail
@@ -8878,15 +8886,6 @@ static int ixgbe_tx_map(struct ixgbe_ring *tx_ring,
 		 */
 		mmiowb();
 	}
-#else
-	/* notify HW of packet */
-	writel(i, tx_ring->tail);
-
-	/* we need this if more than one processor can write to our tail
-	 * at a time, it synchronizes IO on IA64/Altix systems
-	 */
-	mmiowb();
-#endif /* HAVE_SKB_XMIT_MORE */
 
 	return 0;
 dma_error:
