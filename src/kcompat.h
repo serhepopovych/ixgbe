@@ -74,6 +74,19 @@
 #endif
 #endif
 
+/* This is default configuration of ixgbe driver for
+ * software packet forwarding platform.
+ *
+ * We disable following features:
+ *  - FCoE
+ *  - LRO
+ *  - Packet split (we are running on platforms without IOMMU)
+ */
+#define DISABLE_PACKET_SPLIT
+#define IXGBE_NO_LRO
+#undef CONFIG_FCOE
+#undef CONFIG_FCOE_MODULE
+
 /* NAPI enable/disable flags here */
 #define NAPI
 
