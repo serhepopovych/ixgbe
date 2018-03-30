@@ -557,6 +557,8 @@ struct ixgbe_nvm_version {
 #define IXGBE_DMATXCTL_MBINTEN	0x40 /* Bit 6 */
 #define IXGBE_DMATXCTL_VT_SHIFT	16  /* VLAN EtherType */
 
+#define IXGBE_EXVET_VET_EXT_SHIFT 16 /* Global Double VLAN EtherType */
+
 #define IXGBE_PFDTXGSWC_VT_LBEN	0x1 /* Local L2 VT switch enable */
 
 /* Anti-spoofing defines */
@@ -1466,6 +1468,7 @@ struct ixgbe_dmac_config {
 #define IXGBE_CTRL_EXT_PFRSTD	0x00004000 /* Physical Function Reset Done */
 #define IXGBE_CTRL_EXT_NS_DIS	0x00010000 /* No Snoop disable */
 #define IXGBE_CTRL_EXT_RO_DIS	0x00020000 /* Relaxed Ordering disable */
+#define IXGBE_CTRL_EXT_VLAN	0x04000000 /* Extended VLAN */
 #define IXGBE_CTRL_EXT_DRV_LOAD	0x10000000 /* Driver loaded bit for FW */
 
 /* Direct Cache Access (DCA) definitions */
