@@ -9905,7 +9905,7 @@ static int ixgbe_set_features(struct net_device *netdev,
 			    NETIF_F_HW_VLAN_FILTER))
 		ixgbe_set_rx_mode(netdev);
 #endif
-	return 0;
+	return 1;
 
 }
 #endif /* HAVE_NDO_SET_FEATURES */
