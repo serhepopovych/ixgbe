@@ -1234,6 +1234,154 @@ For reduced latency:
    # ethtool -C <ethX> rx-usecs 0
 
 
+Double VLAN support
+-------------------
+
+** Configuration
+
+By default support for double vlans (i.e. Double VLAN mode in hardware) isn't
+active. One might use following command to activate it:
+
+  # ethtool --set-priv-flags eth2 vlan-stag-rx on
+
+To change Ethernet frame Type field id from default ETH_P_8021Q (0x8100) to
+ETH_P_8021AD (0x88a8) as per IEEE 802.1ad specification one might use
+following command:
+
+  # ethtool --set-priv-flags eth2 vlan-stag-ethertype-802.1ad on
+
+and checked with following:
+
+  # ethtool --show-priv-flags eth2
+  Private flags for eth2:
+  flow-director-atr          : on
+  vlan-stag-rx               : on
+  vlan-stag-filter           : on
+  vlan-stag-ethertype-802.1ad: on
+
+** Implementation details
+
+According to "Intel(R) 82599 10 GbE Controller Datasheet" and future
+documentation hardware supports Double VLAN (DV) mode for stacked vlan
+scenarious. However it has few limitations:
+
+  o It is assumed that in this mode frame contains at least one VLAN header:
+    no hardware offloading will be provided for frames without it.
+
+  o If only one header present in the frame it is assumed to be outer.
+
+  o Hardware does not provide any additional offload except skipping outer
+    header to parse inner and next protocols (e.g. IP, IPv6).
+
+  o No support for outer header strip/insert and filtering based on vid in
+    hardware.
+
+  o Support for inner header strip/insert and filtering based on vid in
+    hardware is available as in single vlan mode.
+
+Note that Linux pushes VLAN headers for stacked vlans in native order: from
+upper to lower. Later is put into skb->vlan_tci when output network device
+declares support for hardware offload for header insertion on transmit.
+
+Same applies to filtering: only vids from lowest vlan propagated to the
+driver/hardware.
+
+Also Linux has strict assumption about Ethernet frame Type (EtherType) field
+and VLAN encapsulated protocol (EncapProto):
+
+  o Outer header should have ETH_P_8021AD in EtherType.
+
+  o Inner header should have ETH_P_8021Q in outer header EncapProto.
+
+All above places following restrictions on implementation of double vlans
+support in the driver:
+
+  o Filtering based on inner vid must be turned off: VFTA (VLAN Filter Table
+    Array) contains vids from lowest vlans (outer) but hardware applies
+    filtering to vids from upper vlans (outer).
+
+  o No support for inner header insertion by hardware: skb->vlan_tci contains
+    information for outer header, inner header already added to packet buffer
+    by software. Hardware expects to find inner header vlan_tci in transmit
+    descriptor to offload header insertion.
+
+  o Filtering based on outer vid implemented in software and turned on by
+    default: user might turn it off if required. Promiscuous mode is supported
+    and can be turned on either implicitly or explicitly (e.g. via
+    ip-link(8)).
+
+  o Inner header stripping supported in hardware and turned on by default:
+    user might turn it off with adding neligible overhead.
+
+Note about EtherType field for outer VLAN header:
+
+  o On receive hardware skips outer header when EtherType value matches one
+    configured in NIC specific register (EXVET).
+
+    If it does not match, inner header stripping, filtering by vid and any
+    hardware offload for next protocol isn't provided. Frame is delivered as
+    is to upper layers.
+
+    This behavior is identical to one in single vlan mode: no offload for
+    frames with unknown EtherType.
+
+  o Turning off "rx-vlan-filter" (e.g. by ethtool) isn't supported when
+    "vlan-stag-rx" private flag is "on": though not active in hardware since
+    applies to inner header this flag is checked by Linux before calling
+    driver specific routines to add/kill vids to VFTA.
+
+    As said before Linux has strict assumption about EtherType and EncapProto
+    for inner and outer headers. This affects filtering in following manner:
+
+      if "rx-vlan-filter" is "on" then vids for vlans with ETH_P_8021Q
+      protocol will trigger call to driver specific routine to add/kill
+      vids in VFTA
+
+      if "vlan-stag-rx" private flag is "on" then vids for vlans with
+      ETH_P_8021AD protocol will trigger call to driver specific routine to
+      add/kill vids in VFTA
+
+    Turning off "vlan-stag-rx" later would not stop traffic for
+    configured vlans by hardware filters for inner header.
+
+    This preserves interoperability with "vlan-stag-rx" "off" mode in
+    which double vlan feature is off.
+
+** Troubleshooting and debugging
+
+There are three NIC registers participating in Double VLAN mode configuration
+and functioning: CTRL_EXT, DMATXCTL and EXVET. Additionally VLNCTRL register
+might be interesting to ensure filtering based on inner header vid is turned
+off/on:
+
+  0x05088: VLNCTRL (VLAN Control register)              0x00008100
+         VLAN Mode:                                     disabled
+         VLAN Filter:                                   disabled
+                                                        ^^^^^^^^
+                                                        filters off for DV
+
+  0x00018: CTRL_EXT    (Extended Device Control)        0x14010000
+                                                           ^
+                                                           0x4000000[26]
+
+  0x04A80: DMATXCTL    (DMA Tx Control)                 0x8100005D
+                                                                 ^
+                                                                 0x8[3]
+
+  0x05078: EXVET       (Extended VLAN Ether Type)       0x81000000
+                                                          ^^^^
+                                                          EtherType for DV
+
+Their contents can be dumped by ethtool(8) using following command:
+
+  # ethtool --register-dump eth2
+
+Note that DMATXCTL and EXVET are only available in patched version of
+ethtool(8).
+
+In CTRL_EXT register bit 26 and in DMATXCTL bit 3 are set when Double VLAN
+mode is in effect and EXVET[16:31] contains Little Endian (LE) representation
+of EtherType.
 
 Known Issues/Troubleshooting
 ============================
