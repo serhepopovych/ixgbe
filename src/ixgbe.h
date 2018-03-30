@@ -886,6 +886,9 @@ struct ixgbe_adapter {
 #endif
 	enum ixgbe_fc_mode last_lfc_mode;
 
+	/* Outer VLAN Ethernet type */
+	u16 outer_vlan_proto;
+
 	int num_q_vectors;	/* current number of q_vectors for device */
 	int max_q_vectors;	/* upper limit of q_vectors for device */
 	struct ixgbe_ring_feature ring_feature[RING_F_ARRAY_SIZE];
