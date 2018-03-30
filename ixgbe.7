@@ -209,6 +209,20 @@ This parameter is only relevant for devices operating in SR-IOV mode.
 When this parameter is set, the driver detects malicious VF driver and
 disables its Tx/Rx queues until a VF driver reset occurs.
 .LP
+.B DV (Double VLAN)
+.IP
+.B Valid Range: 0-1
+.IP
+0 = Disabled
+.IP
+1 = Enabled
+.IP
+Control Double VLAN mode on device. If enabled hardware assumes that at least
+single vlan header present in packet buffer and second header is skipped to
+enable rest of L2/L3 offloading processing (e.g. RSS). It is disabled by default
+since VID filtering, if enabled, is done in software by driver and not compatible
+with VMDq.
+.LP
 .B Jumbo Frames
 .IP
 Jumbo Frames support is enabled by changing the Maximum Transmission Unit (MTU) to a value larger than the default value of 1500.

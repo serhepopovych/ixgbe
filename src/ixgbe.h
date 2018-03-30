@@ -906,7 +906,9 @@ struct ixgbe_adapter {
 #define IXGBE_FLAG2_PHY_INTERRUPT		(u32)(1 << 17)
 #define IXGBE_FLAG2_VLAN_PROMISC		(u32)(1 << 18)
 #define IXGBE_FLAG2_RX_LEGACY			(u32)(1 << 19)
-#define IXGBE_FLAG2_AUTO_DISABLE_VF		BIT(20)
+#define IXGBE_FLAG2_AUTO_DISABLE_VF		(u32)(1 << 20)
+#define IXGBE_FLAG2_VLAN_STAG_RX		(u32)(1 << 21)
+#define IXGBE_FLAG2_VLAN_STAG_FILTER		(u32)(1 << 22)
 
 	/* Tx fast path data */
 	int num_tx_queues;
@@ -1275,6 +1277,13 @@ void ixgbe_disable_tx_queue(struct ixgbe_adapter *adapter);
 #ifdef ETHTOOL_OPS_COMPAT
 int ethtool_ioctl(struct ifreq *ifr);
 #endif
+#ifdef HAVE_RHEL6_NET_DEVICE_OPS_EXT
+u32 ixgbe_vlan_double_fix_features(struct net_device *netdev, u32 features);
+#else
+netdev_features_t ixgbe_vlan_double_fix_features(struct net_device *netdev,
+						 netdev_features_t features);
+#endif
+
 
 #if IS_ENABLED(CONFIG_FCOE)
 void ixgbe_configure_fcoe(struct ixgbe_adapter *adapter);
