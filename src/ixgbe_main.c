@@ -5122,7 +5122,7 @@ static void ixgbe_vlan_double_enable(struct ixgbe_adapter *adapter)
 {
 	struct ixgbe_hw *hw = &adapter->hw;
 	u32 ctrl_ext, dmatxctl, exvet;
-	__le16 vlan_proto = cpu_to_le16(ETH_P_8021Q);
+	__le16 vlan_proto = cpu_to_le16(adapter->outer_vlan_proto);
 
 	ctrl_ext = IXGBE_READ_REG(hw, IXGBE_CTRL_EXT);
 	dmatxctl = IXGBE_READ_REG(hw, IXGBE_DMATXCTL);
@@ -10117,7 +10117,10 @@ static void ixgbe_atr(struct ixgbe_ring *ring,
 
 	/*
 	 * since src port and flex bytes occupy the same word XOR them together
-	 * and write the value to source port portion of compressed dword
+	 * and write the value to source port portion of compressed dword.
+	 *
+	 * use ETH_P_8021Q for flow distribution, even when VLAN EtherType is
+	 * different (e.g. ETH_P_8021AD): this has really neligible impact here.
 	 */
 	if (first->tx_flags & (IXGBE_TX_FLAGS_SW_VLAN | IXGBE_TX_FLAGS_HW_VLAN))
 		common.port.src ^= th->dest ^ htons(ETH_P_8021Q);
@@ -10490,7 +10493,8 @@ netdev_tx_t ixgbe_xmit_frame_ring(struct sk_buff *skb,
 		tx_flags |= skb_vlan_tag_get(skb) << IXGBE_TX_FLAGS_VLAN_SHIFT;
 		tx_flags |= IXGBE_TX_FLAGS_HW_VLAN;
 	/* else if it is a SW VLAN check the next protocol and store the tag */
-	} else if (protocol == htons(ETH_P_8021Q)) {
+	} else if (protocol == htons(ETH_P_8021Q) ||
+		   protocol == htons(ETH_P_8021AD)) {
 		struct vlan_hdr *vhdr, _vhdr;
 		vhdr = skb_header_pointer(skb, ETH_HLEN, sizeof(_vhdr), &_vhdr);
 		if (!vhdr)
@@ -13244,6 +13248,9 @@ static int ixgbe_probe(struct pci_dev *pdev,
 #endif
 	netdev->features =
 		ixgbe_vlan_double_fix_features(netdev, netdev->features);
+
+	/* By default outer vlan header ethertype is the same as inner */
+	adapter->outer_vlan_proto = ETH_P_8021Q;
 
 #if IS_ENABLED(CONFIG_DCB)
 	if (adapter->flags & IXGBE_FLAG_DCB_CAPABLE)
