@@ -715,10 +715,12 @@ int ixgbe_clean_rx_irq_zc(struct ixgbe_q_vector *q_vector,
 		if (eth_skb_pad(skb))
 			continue;
 
+		if (ixgbe_process_skb_fields(rx_ring, rx_desc, skb))
+			continue;
+
 		total_rx_bytes += skb->len;
 		total_rx_packets++;
 
-		ixgbe_process_skb_fields(rx_ring, rx_desc, skb);
 		ixgbe_rx_skb(q_vector, rx_ring, rx_desc, skb);
 	}
 

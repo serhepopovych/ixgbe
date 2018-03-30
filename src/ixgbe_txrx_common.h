@@ -62,7 +62,7 @@ void ixgbe_xsk_clean_tx_ring(struct ixgbe_ring *tx_ring);
 bool ixgbe_cleanup_headers(struct ixgbe_ring __maybe_unused *rx_ring,
 			   union ixgbe_adv_rx_desc *rx_desc,
 			   struct sk_buff *skb);
-void ixgbe_process_skb_fields(struct ixgbe_ring *rx_ring,
+bool ixgbe_process_skb_fields(struct ixgbe_ring *rx_ring,
 			      union ixgbe_adv_rx_desc *rx_desc,
 			      struct sk_buff *skb);
 void ixgbe_rx_skb(struct ixgbe_q_vector *q_vector,
