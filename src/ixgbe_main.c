@@ -1467,22 +1467,109 @@ static void ixgbe_update_rsc_stats(struct ixgbe_ring *rx_ring,
 	IXGBE_CB(skb)->append_cnt = 0;
 }
 
-static void ixgbe_rx_vlan(struct ixgbe_ring *ring,
-			  union ixgbe_adv_rx_desc *rx_desc,
-			  struct sk_buff *skb)
+static inline bool ixgbe_vlan_tag_present(struct sk_buff *skb)
 {
-	struct net_device *netdev = ring->netdev;
-	struct ixgbe_adapter __maybe_unused *adapter = netdev_priv(netdev);
-	netdev_features_t __maybe_unused features = netdev->features;
+#ifdef HAVE_VLAN_RX_REGISTER
+	return IXGBE_CB(skb)->vid != 0;
+#else
+	return skb_vlan_tag_present(skb);
+#endif
+}
+
+static inline void __ixgbe_hwaccel_put_tag(struct sk_buff *skb,
+					   __be16 protocol, u16 vlan_tci)
+{
+#ifdef HAVE_VLAN_RX_REGISTER
+#ifdef VLAN_TAG_PRESENT
+	vlan_tci |= VLAN_TAG_PRESENT;
+#endif
+	IXGBE_CB(skb)->vid = vlan_tci;
+#else
+	__vlan_hwaccel_put_tag(skb, protocol, vlan_tci);
+#endif
+}
+
+static inline bool ixgbe_vlan_double_filter(struct net_device *netdev, u16 tci)
+{
+	struct ixgbe_adapter *adapter = netdev_priv(netdev);
+	u16 vid = tci & VLAN_VID_MASK;
+
+	if (!(adapter->flags2 & IXGBE_FLAG2_VLAN_STAG_FILTER))
+		return false;
+
+	if (netdev->features & NETIF_F_RXALL)
+		return false;
+
+	if (netdev->flags & IFF_PROMISC)
+		return false;
+
+#ifdef HAVE_VLAN_RX_REGISTER
+	return !adapter->vlgrp || !vlan_group_get_device(adapter->vlgrp, vid);
+#else
+	return !test_bit(vid, adapter->active_vlans);
+#endif
+}
+
+static void ixgbe_rx_vlan_untag(struct sk_buff *skb)
+{
+#ifdef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
+	const u32 *a;
+	u32 *b;
+
+	BUILD_BUG_ON(sizeof(u32) != VLAN_HLEN ||
+		     2 * ETH_ALEN / sizeof(u32) != 3);
+
+	a = (void *)skb->data + 2 * ETH_ALEN;
+	b = (void *)skb->data + 2 * ETH_ALEN + VLAN_HLEN;
+
+	*--b = *--a;
+	*--b = *--a;
+	*--b = *--a;
+#else
+	memmove(skb->data + VLAN_HLEN, skb->data, 2 * ETH_ALEN);
+#endif
+	/* Need not checksum updating here as driver never returns
+	 * CHECKSUM_COMPLETE so just pull VLAN_HLEN from the skb here.
+	 */
+	__skb_pull(skb, VLAN_HLEN);
+}
+
+static bool ixgbe_process_vlans(struct ixgbe_ring *rx_ring,
+				union ixgbe_adv_rx_desc *rx_desc,
+				struct sk_buff *skb)
+{
+	struct net_device *netdev = rx_ring->netdev;
+	struct ixgbe_adapter *adapter = netdev_priv(netdev);
+	struct vlan_ethhdr *vhdr = (struct vlan_ethhdr *)skb->data;
+	__be16 protocol;
+	u16 tci;
 	int enable;
+
+	if (WARN_ON_ONCE(ixgbe_vlan_tag_present(skb)))
+		return false;
+
+	enable = !!(adapter->flags2 & IXGBE_FLAG2_VLAN_STAG_RX);
+
+	if (enable && ixgbe_test_staterr(rx_desc, IXGBE_RXD_STAT_VEXT)) {
+		protocol = vhdr->h_vlan_proto;
+		tci = ntohs(vhdr->h_vlan_TCI);
+		if (ixgbe_vlan_double_filter(netdev, tci)) {
+			dev_kfree_skb_any(skb);
+			return true;
+		}
+#ifdef HAVE_VLAN_RX_REGISTER
+		if (adapter->vlgrp)
+#endif
+			__ixgbe_hwaccel_put_tag(skb, protocol, tci);
+	}
 
 #ifdef HAVE_VLAN_RX_REGISTER
 	enable = !!adapter->vlgrp;
 #if defined(HAVE_NDO_SET_FEATURES) || defined(ETHTOOL_GFLAGS)
 #ifdef NETIF_F_HW_VLAN_CTAG_RX
-	enable &= !!(features & NETIF_F_HW_VLAN_CTAG_RX);
+	enable &= !!(netdev->features & NETIF_F_HW_VLAN_CTAG_RX);
 #else
-	enable &= !!(features & NETIF_F_HW_VLAN_RX);
+	enable &= !!(netdev->features & NETIF_F_HW_VLAN_RX);
 #endif
 #endif /* HAVE_NDO_SET_FEATURES || ETHTOOL_GFLAGS */
 #if IS_ENABLED(CONFIG_DCB)
@@ -1490,22 +1577,27 @@ static void ixgbe_rx_vlan(struct ixgbe_ring *ring,
 #endif /* CONFIG_DCB */
 #else /* !HAVE_VLAN_RX_REGISTER */
 #ifdef NETIF_F_HW_VLAN_CTAG_RX
-	enable = !!(features & NETIF_F_HW_VLAN_CTAG_RX);
+	enable = !!(netdev->features & NETIF_F_HW_VLAN_CTAG_RX);
 #else
-	enable = !!(features & NETIF_F_HW_VLAN_RX);
+	enable = !!(netdev->features & NETIF_F_HW_VLAN_RX);
 #endif
 #endif /* HAVE_VLAN_RX_REGISTER */
 
-	if (enable && ixgbe_test_staterr(rx_desc, IXGBE_RXD_STAT_VP))
-#ifndef HAVE_VLAN_RX_REGISTER
-		__vlan_hwaccel_put_tag(skb,
-				       htons(ETH_P_8021Q),
-				       le16_to_cpu(rx_desc->wb.upper.vlan));
-#else
-		IXGBE_CB(skb)->vid = le16_to_cpu(rx_desc->wb.upper.vlan);
-	else
-		IXGBE_CB(skb)->vid = 0;
-#endif
+	if (enable && ixgbe_test_staterr(rx_desc, IXGBE_RXD_STAT_VP)) {
+		protocol = htons(ETH_P_8021Q);
+		tci = le16_to_cpu(rx_desc->wb.upper.vlan);
+		if (ixgbe_vlan_tag_present(skb)) {
+			vhdr->h_vlan_proto = protocol;
+			vhdr->h_vlan_TCI = htons(tci);
+		} else {
+			__ixgbe_hwaccel_put_tag(skb, protocol, tci);
+		}
+	} else {
+		if (ixgbe_vlan_tag_present(skb))
+			ixgbe_rx_vlan_untag(skb);
+	}
+
+	return false;
 }
 
 /**
@@ -1517,8 +1609,10 @@ static void ixgbe_rx_vlan(struct ixgbe_ring *ring,
  * This function checks the ring, descriptor, and packet information in
  * order to populate the hash, checksum, VLAN, timestamp, protocol, and
  * other fields within the skb.
+ *
+ * Returns true if an error was encountered and skb was freed.
  **/
-static void ixgbe_process_skb_fields(struct ixgbe_ring *rx_ring,
+static bool ixgbe_process_skb_fields(struct ixgbe_ring *rx_ring,
 				     union ixgbe_adv_rx_desc *rx_desc,
 				     struct sk_buff *skb)
 {
@@ -1526,6 +1620,9 @@ static void ixgbe_process_skb_fields(struct ixgbe_ring *rx_ring,
 	u32 flags = rx_ring->q_vector->adapter->flags;
 
 #endif
+	if (ixgbe_process_vlans(rx_ring, rx_desc, skb))
+		return true;
+
 	ixgbe_update_rsc_stats(rx_ring, skb);
 
 #ifdef NETIF_F_RXHASH
@@ -1538,11 +1635,11 @@ static void ixgbe_process_skb_fields(struct ixgbe_ring *rx_ring,
 		ixgbe_ptp_rx_hwtstamp(rx_ring, rx_desc, skb);
 
 #endif
-	ixgbe_rx_vlan(rx_ring, rx_desc, skb);
-
 	skb_record_rx_queue(skb, ring_queue_index(rx_ring));
 
 	skb->protocol = eth_type_trans(skb, netdev_ring(rx_ring));
+
+	return false;
 }
 
 static void ixgbe_rx_skb(struct ixgbe_q_vector *q_vector,
@@ -2299,12 +2396,12 @@ static int ixgbe_clean_rx_irq(struct ixgbe_q_vector *q_vector,
 		if (ixgbe_cleanup_headers(rx_ring, rx_desc, skb))
 			continue;
 
+		/* populate checksum, timestamp, VLAN, and protocol */
+		if (ixgbe_process_skb_fields(rx_ring, rx_desc, skb))
+			continue;
+
 		/* probably a little skewed due to removing CRC */
 		total_rx_bytes += skb->len;
-
-		/* populate checksum, timestamp, VLAN, and protocol */
-		ixgbe_process_skb_fields(rx_ring, rx_desc, skb);
-
 #if IS_ENABLED(CONFIG_FCOE)
 		/* if ddp, not passing to ULD unless for FCP_RSP or error */
 		if (ixgbe_rx_is_fcoe(rx_ring, rx_desc)) {
@@ -2466,12 +2563,12 @@ static int ixgbe_clean_rx_irq(struct ixgbe_q_vector *q_vector,
 			continue;
 		}
 
+		/* populate checksum, timestamp, VLAN, and protocol */
+		if (ixgbe_process_skb_fields(rx_ring, rx_desc, skb))
+			continue;
+
 		/* probably a little skewed due to removing CRC */
 		total_rx_bytes += skb->len;
-
-		/* populate checksum, timestamp, VLAN, and protocol */
-		ixgbe_process_skb_fields(rx_ring, rx_desc, skb);
-
 #if IS_ENABLED(CONFIG_FCOE)
 		/* if ddp, not passing to ULD unless for FCP_RSP or error */
 		if (ixgbe_rx_is_fcoe(rx_ring, rx_desc)) {
@@ -4835,6 +4932,49 @@ static void ixgbe_vlan_rx_kill_vid(struct net_device *netdev, u16 vid)
 }
 
 /**
+ * ixgbe_vlan_double_enable - helper to enable second vlan tag processing
+ * @adapter: driver data
+ */
+static void ixgbe_vlan_double_enable(struct ixgbe_adapter *adapter)
+{
+	struct ixgbe_hw *hw = &adapter->hw;
+	u32 ctrl_ext, dmatxctl, exvet;
+	__le16 vlan_proto = cpu_to_le16(ETH_P_8021Q);
+
+	ctrl_ext = IXGBE_READ_REG(hw, IXGBE_CTRL_EXT);
+	dmatxctl = IXGBE_READ_REG(hw, IXGBE_DMATXCTL);
+	exvet = IXGBE_READ_REG(hw, IXGBE_EXVET);
+
+	ctrl_ext |= IXGBE_CTRL_EXT_VLAN;
+	dmatxctl |= IXGBE_DMATXCTL_GDV;
+	exvet &= ~(0xffff << IXGBE_EXVET_VET_EXT_SHIFT);
+	exvet |= (__force u32)vlan_proto << IXGBE_EXVET_VET_EXT_SHIFT;
+
+	IXGBE_WRITE_REG(hw, IXGBE_EXVET, exvet);
+	IXGBE_WRITE_REG(hw, IXGBE_CTRL_EXT, ctrl_ext);
+	IXGBE_WRITE_REG(hw, IXGBE_DMATXCTL, dmatxctl);
+}
+
+/**
+ * ixgbe_vlan_double_disable - helper to disable second vlan tag processing
+ * @adapter: driver data
+ */
+static void ixgbe_vlan_double_disable(struct ixgbe_adapter *adapter)
+{
+	struct ixgbe_hw *hw = &adapter->hw;
+	u32 ctrl_ext, dmatxctl;
+
+	ctrl_ext = IXGBE_READ_REG(hw, IXGBE_CTRL_EXT);
+	dmatxctl = IXGBE_READ_REG(hw, IXGBE_DMATXCTL);
+
+	ctrl_ext &= ~IXGBE_CTRL_EXT_VLAN;
+	dmatxctl &= ~IXGBE_DMATXCTL_GDV;
+
+	IXGBE_WRITE_REG(hw, IXGBE_CTRL_EXT, ctrl_ext);
+	IXGBE_WRITE_REG(hw, IXGBE_DMATXCTL, dmatxctl);
+}
+
+/**
  * ixgbe_vlan_strip_disable - helper to disable vlan tag stripping
  * @adapter: driver data
  */
@@ -5088,6 +5228,15 @@ void ixgbe_vlan_mode(struct net_device *netdev, netdev_features_t features)
 	}
 #endif /* !HAVE_NDO_SET_FEATURES && !ETHTOOL_GFLAGS */
 #endif /* HAVE_VLAN_RX_REGISTER */
+
+	enable = !!(adapter->flags2 & IXGBE_FLAG2_VLAN_STAG_RX);
+
+	if (enable)
+		/* enable SVLAN tag processing */
+		ixgbe_vlan_double_enable(adapter);
+	else
+		/* disable SVLAN tag processing */
+		ixgbe_vlan_double_disable(adapter);
 }
 
 static void ixgbe_restore_vlan(struct ixgbe_adapter *adapter)
@@ -5481,27 +5630,38 @@ void ixgbe_set_rx_mode(struct net_device *netdev)
 #endif /* !HAVE_VLAN_RX_REGISTER && !ESX55 */
 	} else {
 #if defined(HAVE_VLAN_RX_REGISTER) || defined(ESX55)
-		int enable;
+		if (!(adapter->flags2 & IXGBE_FLAG2_VLAN_STAG_RX)) {
+			int enable;
 
 #ifdef HAVE_VLAN_RX_REGISTER
-		enable = !!adapter->vlgrp;
+			enable = !!adapter->vlgrp;
 #ifdef HAVE_NDO_SET_FEATURES
 #ifdef NETIF_F_HW_VLAN_CTAG_RX
-		enable &= !!(features & NETIF_F_HW_VLAN_CTAG_FILTER);
+			enable &= !!(features & NETIF_F_HW_VLAN_CTAG_FILTER);
 #else
-		enable &= !!(features & NETIF_F_HW_VLAN_FILTER);
+			enable &= !!(features & NETIF_F_HW_VLAN_FILTER);
 #endif
 #endif /* HAVE_NDO_SET_FEATURES */
 #else /* !HAVE_VLAN_RX_REGISTER */
 #ifdef NETIF_F_HW_VLAN_CTAG_RX
-		enable = !!(features & NETIF_F_HW_VLAN_CTAG_FILTER);
+			enable = !!(features & NETIF_F_HW_VLAN_CTAG_FILTER);
 #else
-		enable = !!(features & NETIF_F_HW_VLAN_FILTER);
+			enable = !!(features & NETIF_F_HW_VLAN_FILTER);
 #endif
 #endif /* HAVE_VLAN_RX_REGISTER */
-		if (enable)
-			/* enable hardware vlan filtering */
-			vlnctrl |= IXGBE_VLNCTRL_VFE;
+			if (enable)
+				/* enable hardware vlan filtering */
+				vlnctrl |= IXGBE_VLNCTRL_VFE;
+		}
+#else /* !HAVE_VLAN_RX_REGISTER && !ESX55 */
+		if (adapter->flags2 & IXGBE_FLAG2_VLAN_STAG_RX) {
+#ifdef NETIF_F_HW_VLAN_CTAG_FILTER
+			features &= ~NETIF_F_HW_VLAN_CTAG_FILTER;
+#endif
+#ifdef NETIF_F_HW_VLAN_FILTER
+			features &= ~NETIF_F_HW_VLAN_FILTER;
+#endif
+		}
 #endif /* HAVE_VLAN_RX_REGISTER || ESX55 */
 		if (netdev->flags & IFF_ALLMULTI) {
 			fctrl |= IXGBE_FCTRL_MPE;
@@ -10484,6 +10644,61 @@ void ixgbe_do_reset(struct net_device *netdev)
 		ixgbe_reset(adapter);
 }
 
+#ifdef HAVE_RHEL6_NET_DEVICE_OPS_EXT
+u32 ixgbe_vlan_double_fix_features(struct net_device *netdev, u32 features)
+#else
+netdev_features_t ixgbe_vlan_double_fix_features(struct net_device *netdev,
+						 netdev_features_t features)
+#endif
+{
+	struct ixgbe_adapter *adapter = netdev_priv(netdev);
+
+	if (adapter->flags2 & IXGBE_FLAG2_VLAN_STAG_RX) {
+		/* User might turn off VLAN header stripping
+		 * by hardware: receiving routine will pop
+		 * outer tag in this case. There is neligible
+		 * performance penalty for this.
+		 */
+
+		/* Turn off VLAN header insertion by hardware
+		 * and let network stack push them in correct
+		 * order: overwise hardware expects to find
+		 * outer header in transmit buffer which isn't
+		 * valid for encapsulation process for stacked
+		 * vlans.
+		 */
+#ifdef NETIF_F_HW_VLAN_CTAG_TX
+		features &= ~NETIF_F_HW_VLAN_CTAG_TX;
+#endif
+#ifdef NETIF_F_HW_VLAN_TX
+		features &= ~NETIF_F_HW_VLAN_TX;
+#endif
+#ifdef NETIF_F_HW_VLAN_STAG_RX
+		features |= NETIF_F_HW_VLAN_STAG_RX;
+	} else {
+		features &= ~NETIF_F_HW_VLAN_STAG_RX;
+#endif
+	}
+
+	if (adapter->flags2 & IXGBE_FLAG2_VLAN_STAG_FILTER) {
+		/* vlan_hw_filter_capable() has fixed mapping
+		 * between STAG/CTAG and VLAN Ethernet Type:
+		 * to support STAG filtering for ETH_P_8021Q
+		 * type we need to enable CTAG filters too.
+		 */
+#ifdef NETIF_F_HW_VLAN_CTAG_FILTER
+		features |= NETIF_F_HW_VLAN_CTAG_FILTER;
+#endif
+#ifdef NETIF_F_HW_VLAN_STAG_FILTER
+		features |= NETIF_F_HW_VLAN_STAG_FILTER;
+	} else {
+		features &= ~NETIF_F_HW_VLAN_STAG_FILTER;
+#endif
+	}
+
+	return features;
+}
+
 #ifdef HAVE_NDO_SET_FEATURES
 #ifdef HAVE_RHEL6_NET_DEVICE_OPS_EXT
 static u32 ixgbe_fix_features(struct net_device *netdev, u32 features)
@@ -10516,7 +10731,7 @@ static netdev_features_t ixgbe_fix_features(struct net_device *netdev,
 		features &= ~NETIF_F_LRO;
 	}
 
-	return features;
+	return ixgbe_vlan_double_fix_features(netdev, features);
 }
 
 #ifdef HAVE_RHEL6_NET_DEVICE_OPS_EXT
@@ -11887,8 +12102,10 @@ static int ixgbe_probe(struct pci_dev *pdev,
 	netdev->min_mtu = ETH_MIN_MTU;
 	netdev->max_mtu = IXGBE_MAX_JUMBO_FRAME_SIZE - (ETH_HLEN + ETH_FCS_LEN);
 #endif
-
 #endif
+	netdev->features =
+		ixgbe_vlan_double_fix_features(netdev, netdev->features);
+
 #if IS_ENABLED(CONFIG_DCB)
 	if (adapter->flags & IXGBE_FLAG_DCB_CAPABLE)
 		netdev->dcbnl_ops = &ixgbe_dcbnl_ops;

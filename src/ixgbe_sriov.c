@@ -50,6 +50,10 @@ static int __ixgbe_enable_sriov(struct ixgbe_adapter *adapter,
 	struct ixgbe_hw *hw = &adapter->hw;
 	int i;
 
+	/* VMDq requires vlan filtering to be enbled */
+	if (adapter->flags2 & IXGBE_FLAG2_VLAN_STAG_RX)
+		return -EINVAL;
+
 	adapter->flags |= IXGBE_FLAG_SRIOV_ENABLED;
 
 	/* Enable VMDq flag so device will be set in VM mode */

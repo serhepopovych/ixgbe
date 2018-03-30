@@ -176,8 +176,12 @@ static const char ixgbe_gstrings_test[][ETH_GSTRING_LEN] = {
 static const char ixgbe_priv_flags_strings[][ETH_GSTRING_LEN] = {
 #define IXGBE_PRIV_FLAGS_FD_ATR				BIT(0)
 	"flow-director-atr",
+#define IXGBE_PRIV_FLAGS_VLAN_STAG_RX			BIT(1)
+	"vlan-stag-rx",
+#define IXGBE_PRIV_FLAGS_VLAN_STAG_FILTER		BIT(2)
+	"vlan-stag-filter",
 #ifdef HAVE_SWIOTLB_SKIP_CPU_SYNC
-#define IXGBE_PRIV_FLAGS_LEGACY_RX			BIT(1)
+#define IXGBE_PRIV_FLAGS_LEGACY_RX			BIT(3)
 	"legacy-rx",
 #endif
 };
@@ -3008,7 +3012,7 @@ tso_out:
 static int ixgbe_set_flags(struct net_device *netdev, u32 data)
 {
 	struct ixgbe_adapter *adapter = netdev_priv(netdev);
-	u32 supported_flags = ETH_FLAG_RXVLAN | ETH_FLAG_TXVLAN;
+	u32 supported_flags = ETH_FLAG_RXVLAN;
 	u32 changed = netdev->features ^ data;
 	bool need_reset = false;
 	int rc;
@@ -3020,6 +3024,8 @@ static int ixgbe_set_flags(struct net_device *netdev, u32 data)
 #endif
 	if (adapter->flags2 & IXGBE_FLAG2_RSC_CAPABLE)
 		supported_flags |= ETH_FLAG_LRO;
+	if (!(adapter->flags & IXGBE_FLAG2_VLAN_STAG_RX))
+		supported_flags |= ETH_FLAG_TXVLAN;
 
 #ifdef ETHTOOL_GRXRINGS
 	switch (adapter->hw.mac.type) {
@@ -4195,6 +4201,11 @@ static u32 ixgbe_get_priv_flags(struct net_device *netdev)
 	if (adapter->flags2 & IXGBE_FLAG2_RX_LEGACY)
 		priv_flags |= IXGBE_PRIV_FLAGS_LEGACY_RX;
 #endif
+	if (adapter->flags2 & IXGBE_FLAG2_VLAN_STAG_RX)
+		priv_flags |= IXGBE_PRIV_FLAGS_VLAN_STAG_RX;
+
+	if (adapter->flags2 & IXGBE_FLAG2_VLAN_STAG_FILTER)
+		priv_flags |= IXGBE_PRIV_FLAGS_VLAN_STAG_FILTER;
 
 	return priv_flags;
 }
@@ -4211,7 +4222,9 @@ static int ixgbe_set_priv_flags(struct net_device *netdev, u32 priv_flags)
 	enum {
 		IXGBE_SPF_NONE		= 0,
 		IXGBE_SPF_REINIT_LOCKED	= (1 << 0),
-		IXGBE_SPF_RESET		= (1 << 1)
+		IXGBE_SPF_RESET		= (1 << 1),
+		IXGBE_SPF_SET_RX_MODE	= (1 << 2),
+		IXGBE_SPF_SET_FEATURES	= (1 << 3),
 	} do_reset = IXGBE_SPF_NONE;
 
 	if (!changed)
@@ -4249,13 +4262,83 @@ static int ixgbe_set_priv_flags(struct net_device *netdev, u32 priv_flags)
 	}
 #endif
 
+	/* Global Double VLAN features handling */
+	if (changed & IXGBE_PRIV_FLAGS_VLAN_STAG_RX) {
+		struct ixgbe_hw *hw = &adapter->hw;
+
+		switch (hw->mac.type) {
+		case ixgbe_mac_82599EB:
+		case ixgbe_mac_X540:
+		case ixgbe_mac_X550:
+		case ixgbe_mac_X550EM_x:
+		case ixgbe_mac_X550EM_a:
+			/* VMDq requires vlan filtering to be enbled */
+			if (!(adapter->flags & IXGBE_FLAG_VMDQ_ENABLED) &&
+			    (priv_flags & IXGBE_PRIV_FLAGS_VLAN_STAG_RX)) {
+				/* Turn on STAG filter by default: user might
+				 * turn it off later if required.
+				 */
+				if (!(adapter->flags2 & IXGBE_FLAG2_VLAN_STAG_RX)) {
+#ifndef HAVE_VLAN_RX_REGISTER
+					adapter->flags2 |=
+						(IXGBE_FLAG2_VLAN_STAG_RX|
+						 IXGBE_FLAG2_VLAN_STAG_FILTER);
+#else
+					/* No filtering by driver by default: there
+					 * are setups with old kernels where filtering
+					 * might be broken (e.g. vlan on top of macvlan)
+					 */
+					adapter->flags2 |=
+						(IXGBE_FLAG2_VLAN_STAG_RX);
+#endif
+				}
+				break;
+			}
+			/* fall thru */
+		default:
+			/* No filtering by outer tag without outer VLAN
+			 * header acceleration on receive.
+			 */
+			adapter->flags2 &= ~(IXGBE_FLAG2_VLAN_STAG_RX |
+					     IXGBE_FLAG2_VLAN_STAG_FILTER);
+		}
+
+		changed &= ~IXGBE_PRIV_FLAGS_VLAN_STAG_FILTER;
+		do_reset |= IXGBE_SPF_SET_FEATURES;
+	}
+
+	if (changed & IXGBE_PRIV_FLAGS_VLAN_STAG_FILTER) {
+		if (adapter->flags2 & IXGBE_FLAG2_VLAN_STAG_RX) {
+			adapter->flags2 ^= IXGBE_FLAG2_VLAN_STAG_FILTER;
+			do_reset |= IXGBE_SPF_SET_FEATURES;
+		}
+	}
+
+	if (do_reset & IXGBE_SPF_SET_FEATURES) {
+		typeof(netdev->features) features = netdev->features;
+
+		features = ixgbe_vlan_double_fix_features(netdev, features);
+		if (features != netdev->features) {
+			netdev->features = features;
+			netdev_features_change(netdev);
+		}
+
+		do_reset |= IXGBE_SPF_SET_RX_MODE;
+	}
+
 	if (do_reset & IXGBE_SPF_RESET) {
 		ixgbe_do_reset(netdev);
+		do_reset &= ~IXGBE_SPF_SET_RX_MODE;
 	} else if (do_reset & IXGBE_SPF_REINIT_LOCKED) {
 		/* reset interface to repopulate queues */
-		if (netif_running(netdev))
+		if (netif_running(netdev)) {
 			ixgbe_reinit_locked(adapter);
+			do_reset &= ~IXGBE_SPF_SET_RX_MODE;
+		}
 	}
+
+	if (do_reset & IXGBE_SPF_SET_RX_MODE)
+		ixgbe_set_rx_mode(netdev);
 
 	return 0;
 }
