@@ -327,6 +327,13 @@ IXGBE_PARAM(dmac_watchdog,
 IXGBE_PARAM(vxlan_rx,
 	    "VXLAN receive checksum offload (0,1), default 1 = Enable");
 
+/* Enable/disable Double VLAN support
+ *
+ * Valid Range: 0, 1
+ *
+ * Default Value: 0
+ */
+IXGBE_PARAM(DV, "Enable/disable Double VLAN support on 82599+ adapters, default 0 = Disable");
 
 struct ixgbe_option {
 	enum { enable_option, range_option, list_option } type;
@@ -1264,6 +1271,65 @@ void ixgbe_check_options(struct ixgbe_adapter *adapter)
 		default:
 			*aflags &= ~IXGBE_FLAG_MDD_ENABLED;
 			break;
+		}
+	}
+	{ /* DV - Enable Double VLAN support */
+#ifndef HAVE_VLAN_RX_REGISTER
+		const u32 vlan_stag_rx = IXGBE_FLAG2_VLAN_STAG_RX|
+					 IXGBE_FLAG2_VLAN_STAG_FILTER;
+#else
+		/* No filtering by driver by default: there
+		 * are setups with old kernels where filtering
+		 * might be broken (e.g. vlan on top of macvlan)
+		 */
+		const u32 vlan_stag_rx = IXGBE_FLAG2_VLAN_STAG_RX;
+#endif
+
+		adapter->flags2 &= ~vlan_stag_rx;
+
+		switch (adapter->hw.mac.type) {
+		case ixgbe_mac_82599EB:
+		case ixgbe_mac_X540:
+		case ixgbe_mac_X550:
+		case ixgbe_mac_X550EM_x:
+		case ixgbe_mac_X550EM_a: {
+			struct ixgbe_option opt = {
+				.type = enable_option,
+				.name = "Double VLAN",
+				.err  = "defaulting to 0 (disabled)",
+				.def  = OPTION_DISABLED,
+			};
+
+#ifdef module_param_array
+			if (num_DV > bd) {
+#endif
+				unsigned int dv = DV[bd];
+
+				ixgbe_validate_option(adapter->netdev,
+						      &dv, &opt);
+				if (dv)
+					adapter->flags2 |= vlan_stag_rx;
+#ifdef module_param_array
+			} else {
+				if (opt.def == OPTION_ENABLED)
+					adapter->flags2 |= vlan_stag_rx;
+			}
+#endif
+		}
+			break;
+		default:
+			break;
+		}
+
+		/* Check Interoperability */
+		if (adapter->flags2 & IXGBE_FLAG2_VLAN_STAG_RX) {
+			if (*aflags & IXGBE_FLAG_VMDQ_ENABLED) {
+				DPRINTK(PROBE, INFO,
+					"Double VLAN is not supported while VMDq "
+					"enabled.  "
+					"Disabling Double VLAN.\n");
+				adapter->flags2 &= ~vlan_stag_rx;
+			}
 		}
 	}
 }
