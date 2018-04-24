@@ -174,10 +174,10 @@ static const char ixgbe_gstrings_test[][ETH_GSTRING_LEN] = {
 
 #ifdef HAVE_ETHTOOL_GET_SSET_COUNT
 static const char ixgbe_priv_flags_strings[][ETH_GSTRING_LEN] = {
-#define IXGBE_PRIV_FLAGS_FD_ATR		BIT(0)
+#define IXGBE_PRIV_FLAGS_FD_ATR				BIT(0)
 	"flow-director-atr",
 #ifdef HAVE_SWIOTLB_SKIP_CPU_SYNC
-#define IXGBE_PRIV_FLAGS_LEGACY_RX	BIT(1)
+#define IXGBE_PRIV_FLAGS_LEGACY_RX			BIT(1)
 	"legacy-rx",
 #endif
 };
@@ -4392,8 +4392,8 @@ static u32 ixgbe_get_priv_flags(struct net_device *netdev)
 
 	if (adapter->flags & IXGBE_FLAG_FDIR_HASH_CAPABLE)
 		priv_flags |= IXGBE_PRIV_FLAGS_FD_ATR;
-#ifdef HAVE_SWIOTLB_SKIP_CPU_SYNC
 
+#ifdef HAVE_SWIOTLB_SKIP_CPU_SYNC
 	if (adapter->flags2 & IXGBE_FLAG2_RX_LEGACY)
 		priv_flags |= IXGBE_PRIV_FLAGS_LEGACY_RX;
 #endif
@@ -4409,54 +4409,55 @@ static u32 ixgbe_get_priv_flags(struct net_device *netdev)
 static int ixgbe_set_priv_flags(struct net_device *netdev, u32 priv_flags)
 {
 	struct ixgbe_adapter *adapter = netdev_priv(netdev);
-#ifdef HAVE_SWIOTLB_SKIP_CPU_SYNC
-	unsigned int flags2 = adapter->flags2;
-#endif
-	unsigned int flags = adapter->flags;
+	u32 changed = ixgbe_get_priv_flags(netdev) ^ priv_flags;
+	enum {
+		IXGBE_SPF_NONE		= 0,
+		IXGBE_SPF_REINIT_LOCKED	= (1 << 0),
+		IXGBE_SPF_RESET		= (1 << 1)
+	} do_reset = IXGBE_SPF_NONE;
+
+	if (!changed)
+		return 0;
 
 	/* allow the user to control the state of the Flow
 	 * Director ATR (Application Targeted Routing) feature
 	 * of the driver
 	 */
-	flags &= ~IXGBE_FLAG_FDIR_HASH_CAPABLE;
-	if (priv_flags & IXGBE_PRIV_FLAGS_FD_ATR) {
-		/* We cannot enable ATR if VMDq is enabled */
-		if (flags & IXGBE_FLAG_VMDQ_ENABLED)
-			return -EINVAL;
-		/* We cannot enable ATR if we have 2 or more traffic classes */
-		if (netdev_get_num_tc(netdev) > 1)
-			return -EINVAL;
-		/* We cannot enable ATR if RSS is disabled */
-		if (adapter->ring_feature[RING_F_RSS].limit <= 1)
-			return -EINVAL;
-		/* A sample rate of 0 indicates ATR disabled */
-		if (!adapter->atr_sample_rate)
-			return -EINVAL;
-		flags |= IXGBE_FLAG_FDIR_HASH_CAPABLE;
-	}
-#ifdef HAVE_SWIOTLB_SKIP_CPU_SYNC
+	if (changed & IXGBE_PRIV_FLAGS_FD_ATR) {
+		if (priv_flags & IXGBE_PRIV_FLAGS_FD_ATR) {
+			/* We cannot enable ATR if VMDq is enabled */
+			if (adapter->flags & IXGBE_FLAG_VMDQ_ENABLED)
+				return -EINVAL;
+			/* We cannot enable ATR if we have 2 or more traffic classes */
+			if (netdev_get_num_tc(netdev) > 1)
+				return -EINVAL;
+			/* We cannot enable ATR if RSS is disabled */
+			if (adapter->ring_feature[RING_F_RSS].limit <= 1)
+				return -EINVAL;
+			/* A sample rate of 0 indicates ATR disabled */
+			if (!adapter->atr_sample_rate)
+				return -EINVAL;
+		}
 
-	flags2 &= ~IXGBE_FLAG2_RX_LEGACY;
-	if (priv_flags & IXGBE_PRIV_FLAGS_LEGACY_RX)
-		flags2 |= IXGBE_FLAG2_RX_LEGACY;
+		adapter->flags ^= IXGBE_FLAG_FDIR_HASH_CAPABLE;
+		/* ATR state change requires a reset */
+		do_reset |= IXGBE_SPF_RESET;
+	}
+
+#ifdef HAVE_SWIOTLB_SKIP_CPU_SYNC
+	if (changed & IXGBE_PRIV_FLAGS_LEGACY_RX) {
+		adapter->flags2 ^= IXGBE_FLAG2_RX_LEGACY;
+		do_reset |= IXGBE_SPF_REINIT_LOCKED;
+	}
 #endif
 
-	if (flags != adapter->flags) {
-		adapter->flags = flags;
-
-		/* ATR state change requires a reset */
+	if (do_reset & IXGBE_SPF_RESET) {
 		ixgbe_do_reset(netdev);
-#ifndef HAVE_SWIOTLB_SKIP_CPU_SYNC
-	}
-#else
-	} else if (flags2 != adapter->flags2) {
-		adapter->flags2 = flags2;
-
+	} else if (do_reset & IXGBE_SPF_REINIT_LOCKED) {
 		/* reset interface to repopulate queues */
 		if (netif_running(netdev))
 			ixgbe_reinit_locked(adapter);
 	}
-#endif
 
 	return 0;
 }
