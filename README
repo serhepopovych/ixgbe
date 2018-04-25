@@ -1454,13 +1454,8 @@ VLAN tags are stripped on kernels earlier than 2.6.36
 
 In order to support DCB, kernels earlier than 2.6.36 strip VLAN tags for
 VLAN0. This ensures connectivity using 802.1p frames between kernels that
-have built-in support and kernels that do not.
-
-If the VLAN tags are necessary AND DCB is NOT used, disable vlan stripping
-on older kernels at build time with the following:
-
-  # make CFLAGS_EXTRA=-DIXGBE_DISABLE_8021P_SUPPORT
-
+have built-in support and kernels that do not. This achieved by always
+enabling hardware stripping when DCB is in effect.
 
 Support
 =======
