@@ -173,13 +173,6 @@ static inline int ixgbe_skb_pad(void)
 	(DMA_ATTR_SKIP_CPU_SYNC | DMA_ATTR_WEAK_ORDERING)
 #endif
 
-/* assume the kernel supports 8021p to avoid stripping vlan tags */
-#ifdef IXGBE_DISABLE_8021P_SUPPORT
-#ifndef HAVE_8021P_SUPPORT
-#define HAVE_8021P_SUPPORT
-#endif
-#endif /* IXGBE_DISABLE_8021P_SUPPORT */
-
 enum ixgbe_tx_flags {
 	/* cmd_type flags */
 	IXGBE_TX_FLAGS_HW_VLAN	= 0x01,

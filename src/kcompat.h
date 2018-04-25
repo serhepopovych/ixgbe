@@ -3646,10 +3646,6 @@ do {								\
 #define u64_stats_fetch_retry_bh(a,b) (0)
 #define u64_stats_fetch_begin_bh(a) (0)
 
-#if (RHEL_RELEASE_CODE && RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(6,1))
-#define HAVE_8021P_SUPPORT
-#endif
-
 /* RHEL6.4 and SLES11sp2 backported skb_tx_timestamp */
 #if (!(RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(6,4)) && \
      !(SLE_VERSION_CODE >= SLE_VERSION(11,2,0)))
@@ -3668,7 +3664,6 @@ static inline void skb_tx_timestamp(struct sk_buff __always_unused *skb)
 			} while (0)
 
 #define HAVE_PM_QOS_REQUEST_ACTIVE
-#define HAVE_8021P_SUPPORT
 #define HAVE_NDO_GET_STATS64
 #endif /* < 2.6.36 */
 
