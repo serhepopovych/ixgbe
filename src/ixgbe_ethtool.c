@@ -968,7 +968,7 @@ static void ixgbe_set_msglevel(struct net_device *netdev, u32 data)
 
 static int ixgbe_get_regs_len(struct net_device __always_unused *netdev)
 {
-#define IXGBE_REGS_LEN  1145
+#define IXGBE_REGS_LEN  1147
 	return IXGBE_REGS_LEN * sizeof(u32);
 }
 
@@ -1339,6 +1339,19 @@ static void ixgbe_get_regs(struct net_device *netdev, struct ethtool_regs *regs,
 	regs_buff[1143] = IXGBE_R32_Q(hw, IXGBE_SECRXCTRL);
 	regs_buff[1144] = IXGBE_R32_Q(hw, IXGBE_SECRXSTAT);
 
+	/* 82599+ specific GDV registers */
+	switch (hw->mac.type) {
+	case ixgbe_mac_82599EB:
+	case ixgbe_mac_X540:
+	case ixgbe_mac_X550:
+	case ixgbe_mac_X550EM_x:
+	case ixgbe_mac_X550EM_a:
+		regs_buff[1145] = IXGBE_R32_Q(hw, IXGBE_DMATXCTL);
+		regs_buff[1146] = IXGBE_R32_Q(hw, IXGBE_EXVET);
+		break;
+	default:
+		break;
+	}
 }
 
 static int ixgbe_get_eeprom_len(struct net_device *netdev)
