@@ -4810,7 +4810,6 @@ static void ixgbe_vlan_rx_kill_vid(struct net_device *netdev, u16 vid)
 #endif
 }
 
-#ifdef HAVE_8021P_SUPPORT
 /**
  * ixgbe_vlan_strip_disable - helper to disable vlan tag stripping
  * @adapter: driver data
@@ -4850,7 +4849,6 @@ void ixgbe_vlan_strip_disable(struct ixgbe_adapter *adapter)
 	}
 }
 
-#endif /* HAVE_8021P_SUPPORT */
 /**
  * ixgbe_vlan_strip_enable - helper to enable vlan tag stripping
  * @adapter: driver data
@@ -5008,12 +5006,8 @@ static void ixgbe_vlan_mode(struct net_device *netdev, struct vlan_group *grp)
 void ixgbe_vlan_mode(struct net_device *netdev, u32 features)
 #endif
 {
-#if defined(HAVE_VLAN_RX_REGISTER) || defined(HAVE_8021P_SUPPORT)
 	struct ixgbe_adapter *adapter = netdev_priv(netdev);
-#endif
-#ifdef HAVE_8021P_SUPPORT
 	bool enable;
-#endif
 
 #ifdef HAVE_VLAN_RX_REGISTER
 	if (!test_bit(__IXGBE_DOWN, &adapter->state))
@@ -5023,9 +5017,7 @@ void ixgbe_vlan_mode(struct net_device *netdev, u32 features)
 
 	if (!test_bit(__IXGBE_DOWN, &adapter->state))
 		ixgbe_irq_enable(adapter, true, true);
-#endif
-#ifdef HAVE_8021P_SUPPORT
-#ifdef HAVE_VLAN_RX_REGISTER
+
 	enable = (grp || (adapter->flags & IXGBE_FLAG_DCB_ENABLED));
 #else
 #ifdef NETIF_F_HW_VLAN_CTAG_RX
@@ -5040,8 +5032,6 @@ void ixgbe_vlan_mode(struct net_device *netdev, u32 features)
 	else
 		/* disable VLAN tag insert/strip */
 		ixgbe_vlan_strip_disable(adapter);
-
-#endif /* HAVE_8021P_SUPPORT */
 }
 
 static void ixgbe_restore_vlan(struct ixgbe_adapter *adapter)
@@ -5060,10 +5050,6 @@ static void ixgbe_restore_vlan(struct ixgbe_adapter *adapter)
 #else
 	ixgbe_vlan_rx_add_vid(adapter->netdev, 0);
 #endif
-#ifndef HAVE_8021P_SUPPORT
-	ixgbe_vlan_strip_enable(adapter);
-#endif
-
 	if (adapter->vlgrp) {
 		for (; vid < VLAN_N_VID; vid++) {
 			if (!vlan_group_get_device(adapter->vlgrp, vid))
@@ -5500,16 +5486,18 @@ void ixgbe_set_rx_mode(struct net_device *netdev)
 
 	IXGBE_WRITE_REG(hw, IXGBE_FCTRL, fctrl);
 
-#ifdef HAVE_8021P_SUPPORT
+#ifdef HAVE_VLAN_RX_REGISTER
+	if (adapter->vlgrp || (adapter->flags & IXGBE_FLAG_DCB_ENABLED))
+#else
 #ifdef NETIF_F_HW_VLAN_CTAG_RX
 	if (features & NETIF_F_HW_VLAN_CTAG_RX)
 #else
 	if (features & NETIF_F_HW_VLAN_RX)
-#endif
+#endif /* NETIF_F_HW_VLAN_CTAG_RX */
+#endif /* HAVE_VLAN_RX_REGISTER */
 		ixgbe_vlan_strip_enable(adapter);
 	else
 		ixgbe_vlan_strip_disable(adapter);
-#endif /* HAVE_8021P_SUPPORT */
 
 #if defined(NETIF_F_HW_VLAN_CTAG_FILTER)
 	if (features & NETIF_F_HW_VLAN_CTAG_FILTER)
