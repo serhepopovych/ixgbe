@@ -4234,16 +4234,6 @@ typedef u32 netdev_features_t;
 #define HAVE_ETHTOOL_GRXFHINDIR_SIZE
 #endif /* SLE_VERSION(11,3,0) */
 #define netif_xmit_stopped(_q) netif_tx_queue_stopped(_q)
-#if !(SLE_VERSION_CODE && SLE_VERSION_CODE >= SLE_VERSION(11,4,0))
-static inline int __kc_ipv6_skip_exthdr(const struct sk_buff *skb, int start,
-					u8 *nexthdrp,
-					__be16 __always_unused *frag_offp)
-{
-	return ipv6_skip_exthdr(skb, start, nexthdrp);
-}
-#undef ipv6_skip_exthdr
-#define ipv6_skip_exthdr(a,b,c,d) __kc_ipv6_skip_exthdr((a), (b), (c), (d))
-#endif /* !SLES11sp4 or greater */
 
 #if (!(RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(6,4)) && \
      !(SLE_VERSION_CODE >= SLE_VERSION(11,3,0)))
