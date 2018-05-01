@@ -3779,21 +3779,6 @@ static inline void *_kc_vzalloc(unsigned long size)
 }
 #define vzalloc(_size) _kc_vzalloc(_size)
 
-#if (!(RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(5,7)) || \
-     (RHEL_RELEASE_CODE == RHEL_RELEASE_VERSION(6,0)))
-static inline __be16 vlan_get_protocol(const struct sk_buff *skb)
-{
-	if (vlan_tx_tag_present(skb) ||
-	    skb->protocol != cpu_to_be16(ETH_P_8021Q))
-		return skb->protocol;
-
-	if (skb_headlen(skb) < sizeof(struct vlan_ethhdr))
-		return 0;
-
-	return ((struct vlan_ethhdr*)skb->data)->h_vlan_encapsulated_proto;
-}
-#endif /* !RHEL5.7+ || RHEL6.0 */
-
 #ifdef HAVE_HW_TIME_STAMP
 #define SKBTX_HW_TSTAMP BIT(0)
 #define SKBTX_IN_PROGRESS BIT(2)
@@ -5681,6 +5666,53 @@ pci_device_to_OF_node(const struct pci_dev __always_unused *pdev) { return NULL;
 #endif /* !CONFIG_OF && RHEL < 7.3 */
 #else /* < 4.0 */
 #define HAVE_DDP_PROFILE_UPLOAD_SUPPORT
+
+#if !(RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(7,2))
+static inline __be16 __kc_vlan_get_protocol(struct sk_buff *skb, __be16 type,
+					    int *depth)
+{
+	unsigned int vlan_depth = skb->mac_len;
+
+	/* if type is 802.1Q/AD then the header should already be
+	 * present at mac_len - VLAN_HLEN (if mac_len > 0), or at
+	 * ETH_HLEN otherwise
+	 */
+	if (type == htons(ETH_P_8021Q) || type == htons(ETH_P_8021AD)) {
+		if (vlan_depth) {
+			if (WARN_ON(vlan_depth < VLAN_HLEN))
+				return 0;
+			vlan_depth -= VLAN_HLEN;
+		} else {
+			vlan_depth = ETH_HLEN;
+		}
+		do {
+			struct vlan_hdr *vh;
+
+			if (unlikely(!pskb_may_pull(skb,
+						    vlan_depth + VLAN_HLEN)))
+				return 0;
+
+			vh = (struct vlan_hdr *)(skb->data + vlan_depth);
+			type = vh->h_vlan_encapsulated_proto;
+			vlan_depth += VLAN_HLEN;
+		} while (type == htons(ETH_P_8021Q) ||
+			 type == htons(ETH_P_8021AD));
+	}
+
+	if (depth)
+		*depth = vlan_depth;
+
+	return type;
+}
+
+#ifndef __vlan_get_protocol
+#define __vlan_get_protocol    __kc_vlan_get_protocol
+#endif
+#ifndef vlan_get_protocol
+#define vlan_get_protocol(skb) __kc_vlan_get_protocol(skb, (skb)->protocol, NULL)
+#endif
+#endif /* RHEL < 7.2 */
+
 #endif /* < 4.0 */
 
 /*****************************************************************************/
