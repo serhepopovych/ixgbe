@@ -9848,11 +9848,11 @@ netdev_tx_t ixgbe_xmit_frame_ring(struct sk_buff *skb,
 		if (!vhdr)
 			goto out_drop;
 
-		protocol = vhdr->h_vlan_encapsulated_proto;
 		tx_flags |= ntohs(vhdr->h_vlan_TCI) <<
 				  IXGBE_TX_FLAGS_VLAN_SHIFT;
 		tx_flags |= IXGBE_TX_FLAGS_SW_VLAN;
 	}
+	protocol = vlan_get_protocol(skb);
 
 	skb_tx_timestamp(skb);
 
