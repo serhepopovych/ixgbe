@@ -5566,13 +5566,12 @@ int _kc_bitmap_print_to_pagebuf(bool list, char *buf,
 
 #ifndef NETDEV_RSS_KEY_LEN
 #define NETDEV_RSS_KEY_LEN (13 * 4)
-#endif
-#if (!(RHEL_RELEASE_CODE && \
-      ((RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(6,7) && RHEL_RELEASE_CODE < RHEL_RELEASE_VERSION(7,0)) || \
-       (RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(7,2)))))
 #define netdev_rss_key_fill(buffer, len) __kc_netdev_rss_key_fill(buffer, len)
-#endif /* RHEL_RELEASE_CODE */
 void __kc_netdev_rss_key_fill(void *buffer, size_t len);
+#else
+#define HAVE_NETDEV_RSS_KEY_FILL
+#endif /* NETDEV_RSS_KEY_LEN */
+
 #define SPEED_20000 20000
 #define SPEED_40000 40000
 #ifndef dma_rmb
