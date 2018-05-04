@@ -1211,11 +1211,12 @@ u16 ___kc_skb_tx_hash(struct net_device *dev, const struct sk_buff *skb,
 		return hash;
 	}
 
-	if (netdev_get_num_tc(dev)) {
+	qoffset = netdev_get_num_tc(dev);
+	if (qoffset) {
 		struct adapter_struct *kc_adapter = netdev_priv(dev);
 
 		if (skb->priority == TC_PRIO_CONTROL) {
-			qoffset = kc_adapter->dcb_tc - 1;
+			qoffset--;
 		} else {
 			qoffset = skb->vlan_tci;
 			qoffset &= IXGBE_TX_FLAGS_VLAN_PRIO_MASK;
