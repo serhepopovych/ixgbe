@@ -3094,7 +3094,6 @@ void _kc_pci_clear_master(struct pci_dev *dev);
 #define skb_rx_queue_recorded(a) false
 #define skb_get_rx_queue(a) 0
 #define skb_record_rx_queue(a, b) do {} while (0)
-#define skb_tx_hash(n, s) ___kc_skb_tx_hash((n), (s), (n)->real_num_tx_queues)
 #undef CONFIG_FCOE
 #undef CONFIG_FCOE_MODULE
 #ifndef CONFIG_PCI_IOV
@@ -3897,8 +3896,6 @@ static inline int _kc_skb_checksum_start_offset(const struct sk_buff *skb)
 #define kstrtou32(a, b, c)  ((*(c)) = simple_strtoul((a), NULL, (b)), 0)
 #endif /* !(RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(6,4)) */
 #if (!(RHEL_RELEASE_CODE && RHEL_RELEASE_CODE > RHEL_RELEASE_VERSION(6,0)))
-u16 ___kc_skb_tx_hash(struct net_device *, const struct sk_buff *, u16);
-#define __skb_tx_hash(n, s, q) ___kc_skb_tx_hash((n), (s), (q))
 u8 _kc_netdev_get_num_tc(struct net_device *dev);
 #define netdev_get_num_tc(dev) _kc_netdev_get_num_tc(dev)
 int _kc_netdev_set_num_tc(struct net_device *dev, u8 num_tc);
@@ -4897,9 +4894,10 @@ int __kc_netif_set_xps_queue(struct net_device *, const struct cpumask *, u16);
 #endif /* CONFIG_XPS */
 
 #ifdef HAVE_NETDEV_SELECT_QUEUE
-#define _kc_hashrnd 0xd631614b /* not so random hash salt */
-u16 __kc_netdev_pick_tx(struct net_device *dev, struct sk_buff *skb);
+#ifndef __netdev_pick_tx
 #define __netdev_pick_tx __kc_netdev_pick_tx
+u16 __kc_netdev_pick_tx(struct net_device *dev, struct sk_buff *skb);
+#endif /* __netdev_pick_tx */
 #endif /* HAVE_NETDEV_SELECT_QUEUE */
 #else
 #define HAVE_BRIDGE_FILTER
@@ -5188,20 +5186,6 @@ static inline void __kc_skb_set_hash(struct sk_buff __maybe_unused *skb,
 }
 #endif /* !skb_set_hash */
 
-#if (!(RHEL_RELEASE_CODE && RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(7,1)))
-#ifndef skb_get_hash_raw
-#define skb_get_hash_raw __kc_skb_get_hash_raw
-static inline u32 __kc_skb_get_hash_raw(const struct sk_buff __maybe_unused *skb)
-{
-#ifdef NETIF_F_RXHASH
-	return skb->rxhash;
-#else
-	return 0;
-#endif
-}
-#endif /* skb_get_hash_raw */
-#endif /* RHEL_RELEASE_CODE >= 7.1 */
-
 #else	/* RHEL_RELEASE_CODE >= 7.0 || SLE_VERSION_CODE >= 12.0 */
 
 #if ((RHEL_RELEASE_CODE && RHEL_RELEASE_CODE <= RHEL_RELEASE_VERSION(7,0)) ||\
@@ -5276,7 +5260,9 @@ int __kc_ipv6_find_hdr(const struct sk_buff *skb, unsigned int *offset,
 
 #if (!(RHEL_RELEASE_CODE && RHEL_RELEASE_CODE > RHEL_RELEASE_VERSION(7,0)) && \
      !(SLE_VERSION_CODE && SLE_VERSION_CODE >= SLE_VERSION(10,4,0)))
-static inline __u32 skb_get_hash_raw(const struct sk_buff *skb)
+#ifndef skb_get_hash_raw
+#define skb_get_hash_raw __kc_skb_get_hash_raw
+static inline u32 __kc_skb_get_hash_raw(const struct sk_buff __maybe_unused *skb)
 {
 #ifdef NETIF_F_RXHASH
 	return skb->rxhash;
@@ -5284,7 +5270,8 @@ static inline __u32 skb_get_hash_raw(const struct sk_buff *skb)
 	return 0;
 #endif /* NETIF_F_RXHASH */
 }
-#endif /* !RHEL > 5.9 && !SLES >= 10.4 */
+#endif /* skb_get_hash_raw */
+#endif /* !RHEL_RELEASE_CODE > 7.0 && !SLE_VERSION_CODE >= 10.4.0 */
 
 #if (RHEL_RELEASE_CODE < RHEL_RELEASE_VERSION(7,5))
 #define request_firmware_direct	request_firmware

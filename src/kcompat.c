@@ -1193,51 +1193,6 @@ int _kc_ethtool_op_set_flags(struct net_device *dev, u32 data, u32 supported)
 /******************************************************************************/
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,39) )
 #if (!(RHEL_RELEASE_CODE && RHEL_RELEASE_CODE > RHEL_RELEASE_VERSION(6,0)))
-#ifdef HAVE_NETDEV_SELECT_QUEUE
-#include <net/ip.h>
-#include <linux/pkt_sched.h>
-
-u16 ___kc_skb_tx_hash(struct net_device *dev, const struct sk_buff *skb,
-		      u16 num_tx_queues)
-{
-	u32 hash;
-	u16 qoffset = 0;
-	u16 qcount = num_tx_queues;
-
-	if (skb_rx_queue_recorded(skb)) {
-		hash = skb_get_rx_queue(skb);
-		while (unlikely(hash >= num_tx_queues))
-			hash -= num_tx_queues;
-		return hash;
-	}
-
-	qoffset = netdev_get_num_tc(dev);
-	if (qoffset) {
-		struct adapter_struct *kc_adapter = netdev_priv(dev);
-
-		if (skb->priority == TC_PRIO_CONTROL) {
-			qoffset--;
-		} else {
-			qoffset = skb->vlan_tci;
-			qoffset &= IXGBE_TX_FLAGS_VLAN_PRIO_MASK;
-			qoffset >>= 13;
-		}
-
-		qcount = kc_adapter->ring_feature[RING_F_RSS].indices;
-		qoffset *= qcount;
-	}
-
-	if (skb->sk && skb->sk->sk_hash)
-		hash = skb->sk->sk_hash;
-	else
-		hash = (__force u16) skb->protocol ^ skb_get_hash_raw(skb);
-
-	hash = jhash_1word(hash, _kc_hashrnd);
-
-	return (u16) (((u64) hash * qcount) >> 32) + qoffset;
-}
-#endif /* HAVE_NETDEV_SELECT_QUEUE */
-
 u8 _kc_netdev_get_num_tc(struct net_device *dev)
 {
 	struct adapter_struct *kc_adapter = netdev_priv(dev);
@@ -1554,6 +1509,7 @@ int __kc_netif_set_xps_queue(struct net_device *dev, const struct cpumask *mask,
 }
 #endif /* CONFIG_XPS */
 #ifdef HAVE_NETDEV_SELECT_QUEUE
+#define _kc_hashrnd 0xd631614b /* not so random hash salt */
 static inline int kc_get_xps_queue(struct net_device *dev, struct sk_buff *skb)
 {
 #ifdef CONFIG_XPS
@@ -1609,6 +1565,50 @@ static inline int kc_get_xps_queue(struct net_device *dev, struct sk_buff *skb)
 #endif
 }
 
+#include <net/ip.h>
+#include <linux/pkt_sched.h>
+
+static inline u16 kc_skb_tx_hash(struct net_device *dev,
+				 const struct sk_buff *skb,
+				 u16 num_tx_queues)
+{
+	u32 hash;
+	u16 qoffset = 0;
+	u16 qcount = num_tx_queues;
+
+	if (skb_rx_queue_recorded(skb)) {
+		hash = skb_get_rx_queue(skb);
+		while (unlikely(hash >= num_tx_queues))
+			hash -= num_tx_queues;
+		return hash;
+	}
+
+	qoffset = netdev_get_num_tc(dev);
+	if (qoffset) {
+		struct adapter_struct *kc_adapter = netdev_priv(dev);
+
+		if (skb->priority == TC_PRIO_CONTROL) {
+			qoffset--;
+		} else {
+			qoffset = skb->vlan_tci;
+			qoffset &= IXGBE_TX_FLAGS_VLAN_PRIO_MASK;
+			qoffset >>= 13;
+		}
+
+		qcount = kc_adapter->ring_feature[RING_F_RSS].indices;
+		qoffset *= qcount;
+	}
+
+	if (skb->sk && skb->sk->sk_hash)
+		hash = skb->sk->sk_hash;
+	else
+		hash = (__force u16) skb->protocol ^ skb_get_hash_raw(skb);
+
+	hash = jhash_1word(hash, _kc_hashrnd);
+
+	return (u16) (((u64) hash * qcount) >> 32) + qoffset;
+}
+
 u16 __kc_netdev_pick_tx(struct net_device *dev, struct sk_buff *skb)
 {
 	struct sock *sk = skb->sk;
@@ -1624,7 +1624,7 @@ u16 __kc_netdev_pick_tx(struct net_device *dev, struct sk_buff *skb)
 
 	new_index = kc_get_xps_queue(dev, skb);
 	if (new_index < 0)
-		new_index = skb_tx_hash(dev, skb);
+		new_index = kc_skb_tx_hash(dev, skb, dev->real_num_tx_queues);
 
 	if (queue_index != new_index && sk) {
 		struct dst_entry *dst =
