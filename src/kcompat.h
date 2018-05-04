@@ -3268,6 +3268,7 @@ static inline int _kc_pm_runtime_get_sync(struct device __always_unused *dev)
      (RHEL_RELEASE_CODE < RHEL_RELEASE_VERSION(7,0)))
 #define HAVE_RHEL6_NET_DEVICE_OPS_EXT
 #define HAVE_NDO_SET_FEATURES
+#define skb_set_hash skb_set_hash
 #endif /* RHEL >= 6.6 && RHEL < 7.0 */
 #if defined(CONFIG_FCOE) || defined(CONFIG_FCOE_MODULE)
 #ifndef HAVE_NETDEV_OPS_FCOE_ENABLE
@@ -5183,6 +5184,20 @@ static inline void __kc_skb_set_hash(struct sk_buff __maybe_unused *skb,
 #endif
 }
 #endif /* !skb_set_hash */
+
+#if (!(RHEL_RELEASE_CODE && RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(7,1)))
+#ifndef skb_get_hash_raw
+#define skb_get_hash_raw __kc_skb_get_hash_raw
+static inline u32 __kc_skb_get_hash_raw(const struct sk_buff __maybe_unused *skb)
+{
+#ifdef NETIF_F_RXHASH
+	return skb->rxhash;
+#else
+	return 0;
+#endif
+}
+#endif /* skb_get_hash_raw */
+#endif /* RHEL_RELEASE_CODE >= 7.1 */
 
 #else	/* RHEL_RELEASE_CODE >= 7.0 || SLE_VERSION_CODE >= 12.0 */
 

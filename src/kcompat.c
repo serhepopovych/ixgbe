@@ -1230,11 +1230,7 @@ u16 ___kc_skb_tx_hash(struct net_device *dev, const struct sk_buff *skb,
 	if (skb->sk && skb->sk->sk_hash)
 		hash = skb->sk->sk_hash;
 	else
-#ifdef NETIF_F_RXHASH
-		hash = (__force u16) skb->protocol ^ skb->rxhash;
-#else
-		hash = skb->protocol;
-#endif
+		hash = (__force u16) skb->protocol ^ skb_get_hash_raw(skb);
 
 	hash = jhash_1word(hash, _kc_hashrnd);
 
@@ -1584,7 +1580,7 @@ static inline int kc_get_xps_queue(struct net_device *dev, struct sk_buff *skb)
 					hash = skb->sk->sk_hash;
 				else
 					hash = (__force u16) skb->protocol ^
-					    skb->rxhash;
+					    skb_get_hash_raw(skb);
 				hash = jhash_1word(hash, _kc_hashrnd);
 				queue_index = map->queues[
 				    ((u64)hash * map->len) >> 32];
