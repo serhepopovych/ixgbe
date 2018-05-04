@@ -2946,7 +2946,6 @@ extern void _kc_pci_clear_master(struct pci_dev *dev);
 #define skb_rx_queue_recorded(a) false
 #define skb_get_rx_queue(a) 0
 #define skb_record_rx_queue(a, b) do {} while (0)
-#define skb_tx_hash(n, s) ___kc_skb_tx_hash((n), (s), (n)->real_num_tx_queues)
 #undef CONFIG_FCOE
 #undef CONFIG_FCOE_MODULE
 #ifndef CONFIG_PCI_IOV
@@ -3749,8 +3748,6 @@ static inline int _kc_skb_checksum_start_offset(const struct sk_buff *skb)
 #define kstrtou32(a, b, c)  ((*(c)) = simple_strtoul((a), NULL, (b)), 0)
 #endif /* !(RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(6,4)) */
 #if (!(RHEL_RELEASE_CODE && RHEL_RELEASE_CODE > RHEL_RELEASE_VERSION(6,0)))
-extern u16 ___kc_skb_tx_hash(struct net_device *, const struct sk_buff *, u16);
-#define __skb_tx_hash(n, s, q) ___kc_skb_tx_hash((n), (s), (q))
 extern u8 _kc_netdev_get_num_tc(struct net_device *dev);
 #define netdev_get_num_tc(dev) _kc_netdev_get_num_tc(dev)
 extern int _kc_netdev_set_num_tc(struct net_device *dev, u8 num_tc);
@@ -4740,9 +4737,10 @@ extern int __kc_netif_set_xps_queue(struct net_device *, const struct cpumask *,
 #endif /* CONFIG_XPS */
 
 #ifdef HAVE_NETDEV_SELECT_QUEUE
-#define _kc_hashrnd 0xd631614b /* not so random hash salt */
-extern u16 __kc_netdev_pick_tx(struct net_device *dev, struct sk_buff *skb);
+#ifndef __netdev_pick_tx
 #define __netdev_pick_tx __kc_netdev_pick_tx
+extern u16 __kc_netdev_pick_tx(struct net_device *dev, struct sk_buff *skb);
+#endif /* __netdev_pick_tx */
 #endif /* HAVE_NETDEV_SELECT_QUEUE */
 #else
 #define HAVE_BRIDGE_FILTER
