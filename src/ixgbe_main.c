@@ -1420,28 +1420,28 @@ static inline bool ixgbe_close_active_frag_list(struct sk_buff *head)
 static void ixgbe_receive_skb(struct ixgbe_q_vector *q_vector,
 			      struct sk_buff *skb)
 {
+	struct napi_struct *napi = &q_vector->napi;
 	u16 vlan_tag = IXGBE_CB(skb)->vid;
 
 #if defined(NETIF_F_HW_VLAN_TX) || defined(NETIF_F_HW_VLAN_CTAG_TX)
-	if (vlan_tag & VLAN_VID_MASK) {
+	if (vlan_tag) {
 		/* by placing vlgrp at start of structure we can alias it */
 		struct vlan_group **vlgrp = netdev_priv(skb->dev);
-		if (!*vlgrp)
-			dev_kfree_skb_any(skb);
-		else if (q_vector->netpoll_rx)
-			vlan_hwaccel_rx(skb, *vlgrp, vlan_tag);
-		else
-			vlan_gro_receive(&q_vector->napi,
-					 *vlgrp, vlan_tag, skb);
-	} else {
-#endif /* NETIF_F_HW_VLAN_TX || NETIF_F_HW_VLAN_CTAG_TX */
-		if (q_vector->netpoll_rx)
-			netif_rx(skb);
-		else
-			napi_gro_receive(&q_vector->napi, skb);
-#if defined(NETIF_F_HW_VLAN_TX) || defined(NETIF_F_HW_VLAN_CTAG_TX)
+
+		if (*vlgrp) {
+			vlan_tag &= VLAN_VID_MASK;
+
+			if (q_vector->netpoll_rx)
+				vlan_hwaccel_rx(skb, *vlgrp, vlan_tag);
+			else
+				vlan_gro_receive(napi, *vlgrp, vlan_tag, skb);
+		}
 	}
 #endif /* NETIF_F_HW_VLAN_TX || NETIF_F_HW_VLAN_CTAG_TX */
+	if (q_vector->netpoll_rx)
+		netif_rx(skb);
+	else
+		napi_gro_receive(napi, skb);
 }
 
 #endif /* HAVE_VLAN_RX_REGISTER */
