@@ -1749,13 +1749,16 @@ bool ixgbe_cleanup_headers(struct ixgbe_ring __maybe_unused *rx_ring,
 			   union ixgbe_adv_rx_desc *rx_desc,
 			   struct sk_buff *skb)
 {
+	struct net_device *netdev = rx_ring->netdev;
+
 	/* XDP packets use error pointer so abort at this point */
 	if (IS_ERR(skb))
 		return true;
 
 	/* verify that the packet does not have any known errors */
 	if (unlikely(ixgbe_test_staterr(rx_desc,
-					IXGBE_RXDADV_ERR_FRAME_ERR_MASK))) {
+					IXGBE_RXDADV_ERR_FRAME_ERR_MASK) &&
+	    !(netdev->features & NETIF_F_RXALL))) {
 		dev_kfree_skb_any(skb);
 		return true;
 	}
@@ -2474,7 +2477,8 @@ static int ixgbe_clean_rx_irq(struct ixgbe_q_vector *q_vector,
 
 		/* ERR_MASK will only have valid bits if EOP set */
 		if (unlikely(ixgbe_test_staterr(rx_desc,
-					   IXGBE_RXDADV_ERR_FRAME_ERR_MASK))) {
+					   IXGBE_RXDADV_ERR_FRAME_ERR_MASK) &&
+			     !(netdev_ring(rx_ring)->features & NETIF_F_RXALL))) {
 			dev_kfree_skb_any(skb);
 			continue;
 		}
@@ -5545,9 +5549,7 @@ void ixgbe_set_rx_mode(struct net_device *netdev)
 #if defined(HAVE_VLAN_RX_REGISTER)
 	u32 vlnctrl;
 #endif
-#if defined(NETIF_F_HW_VLAN_CTAG_FILTER) || defined(NETIF_F_HW_VLAN_FILTER)
 	netdev_features_t features = netdev->features;
-#endif
 	int count;
 
 	/* Check for Promiscuous and All Multicast modes */
@@ -5557,6 +5559,7 @@ void ixgbe_set_rx_mode(struct net_device *netdev)
 #endif
 
 	/* set all bits that we expect to always be set */
+	fctrl &= ~IXGBE_FCTRL_SBP; /* disable store-bad-packets */
 	fctrl |= IXGBE_FCTRL_BAM;
 	fctrl |= IXGBE_FCTRL_DPF; /* discard pause frames when FC enabled */
 	fctrl |= IXGBE_FCTRL_PMCF;
@@ -5627,6 +5630,18 @@ void ixgbe_set_rx_mode(struct net_device *netdev)
 			 ~(IXGBE_VMOLR_MPE | IXGBE_VMOLR_ROMPE |
 			   IXGBE_VMOLR_ROPE);
 		IXGBE_WRITE_REG(hw, IXGBE_VMOLR(VMDQ_P(0)), vmolr);
+	}
+
+	/* This is useful for sniffing bad packets. */
+	if (features & NETIF_F_RXALL) {
+		/* UPE and MPE will be handled by normal PROMISC logic
+		 * in e1000e_set_rx_mode */
+		fctrl |= (IXGBE_FCTRL_SBP | /* Receive bad packets */
+			  IXGBE_FCTRL_BAM | /* RX All Bcast Pkts */
+			  IXGBE_FCTRL_PMCF); /* RX All MAC Ctrl Pkts */
+
+		fctrl &= ~(IXGBE_FCTRL_DPF);
+		/* NOTE:  VLAN filtering is disabled by setting PROMISC */
 	}
 
 	IXGBE_WRITE_REG(hw, IXGBE_FCTRL, fctrl);
@@ -11434,6 +11449,9 @@ static int ixgbe_set_features(struct net_device *netdev,
 		else /* otherwise supported and set the flag */
 			adapter->flags |= IXGBE_FLAG_FDIR_HASH_CAPABLE;
 	}
+
+	if (changed & NETIF_F_RXALL)
+		need_reset = true;
 
 	netdev->features = features;
 
