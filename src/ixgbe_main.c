@@ -4630,7 +4630,7 @@ void ixgbe_vlan_strip_enable(struct ixgbe_adapter *adapter)
 	}
 }
 
-#ifndef HAVE_VLAN_RX_REGISTER
+#if !defined(HAVE_VLAN_RX_REGISTER) && !defined(ESX55)
 static void ixgbe_vlan_promisc_enable(struct ixgbe_adapter *adapter)
 {
 	struct ixgbe_hw *hw = &adapter->hw;
@@ -4744,7 +4744,7 @@ static void ixgbe_vlan_promisc_disable(struct ixgbe_adapter *adapter)
 	for (i = 0; i < hw->mac.vft_size; i += VFTA_BLOCK_SIZE)
 		ixgbe_scrub_vfta(adapter, i);
 }
-#endif /* HAVE_VLAN_RX_REGISTER */
+#endif /* !HAVE_VLAN_RX_REGISTER && !ESX55 */
 
 #ifdef HAVE_VLAN_RX_REGISTER
 static void ixgbe_vlan_mode(struct net_device *netdev, struct vlan_group *grp)
@@ -5198,32 +5198,54 @@ void ixgbe_set_rx_mode(struct net_device *netdev)
 		hw->addr_ctrl.user_set_promisc = true;
 		fctrl |= (IXGBE_FCTRL_UPE | IXGBE_FCTRL_MPE);
 		vmolr |= IXGBE_VMOLR_MPE;
-#ifdef HAVE_VLAN_RX_REGISTER
-		/* Only disable hardware filter vlans in promiscuous mode
-		 * if SR-IOV and VMDQ are disabled - otherwise ensure
-		 * that hardware VLAN filters remain enabled.
-		 */
-		if ((adapter->flags & (IXGBE_FLAG_VMDQ_ENABLED |
-				       IXGBE_FLAG_SRIOV_ENABLED)))
-			vlnctrl |= (IXGBE_VLNCTRL_VFE | IXGBE_VLNCTRL_CFIEN);
-#endif
+#if !defined(HAVE_VLAN_RX_REGISTER) && !defined(ESX55)
 #ifdef NETIF_F_HW_VLAN_CTAG_FILTER
 		features &= ~NETIF_F_HW_VLAN_CTAG_FILTER;
 #endif
 #ifdef NETIF_F_HW_VLAN_FILTER
 		features &= ~NETIF_F_HW_VLAN_FILTER;
 #endif
+#endif /* !HAVE_VLAN_RX_REGISTER && !ESX55 */
 	} else {
+#if defined(HAVE_VLAN_RX_REGISTER) || defined(ESX55)
+		int enable;
+
+#ifdef HAVE_VLAN_RX_REGISTER
+		enable = !!adapter->vlgrp;
+#ifdef HAVE_NDO_SET_FEATURES
+#ifdef NETIF_F_HW_VLAN_CTAG_RX
+		enable &= !!(features & NETIF_F_HW_VLAN_CTAG_FILTER);
+#else
+		enable &= !!(features & NETIF_F_HW_VLAN_FILTER);
+#endif
+#endif /* HAVE_NDO_SET_FEATURES */
+#else /* !HAVE_VLAN_RX_REGISTER */
+#ifdef NETIF_F_HW_VLAN_CTAG_RX
+		enable = !!(features & NETIF_F_HW_VLAN_CTAG_FILTER);
+#else
+		enable = !!(features & NETIF_F_HW_VLAN_FILTER);
+#endif
+#endif /* HAVE_VLAN_RX_REGISTER */
+		if (enable)
+			/* enable hardware vlan filtering */
+			vlnctrl |= IXGBE_VLNCTRL_VFE;
+#endif /* HAVE_VLAN_RX_REGISTER || ESX55 */
 		if (netdev->flags & IFF_ALLMULTI) {
 			fctrl |= IXGBE_FCTRL_MPE;
 			vmolr |= IXGBE_VMOLR_MPE;
 		}
 		hw->addr_ctrl.user_set_promisc = false;
-#if defined(HAVE_VLAN_RX_REGISTER) || defined(ESX55)
-		/* enable hardware vlan filtering */
-		vlnctrl |= IXGBE_VLNCTRL_VFE;
-#endif
 	}
+
+#ifdef HAVE_VLAN_RX_REGISTER
+	/* Only disable hardware filter vlans in promiscuous mode
+	 * if SR-IOV and VMDQ are disabled - otherwise ensure
+	 * that hardware VLAN filters remain enabled.
+	 */
+	if ((adapter->flags & (IXGBE_FLAG_VMDQ_ENABLED |
+			       IXGBE_FLAG_SRIOV_ENABLED)))
+		vlnctrl |= (IXGBE_VLNCTRL_VFE | IXGBE_VLNCTRL_CFIEN);
+#endif
 
 #ifdef HAVE_SET_RX_MODE
 	/*
@@ -5271,19 +5293,22 @@ void ixgbe_set_rx_mode(struct net_device *netdev)
 
 	IXGBE_WRITE_REG(hw, IXGBE_FCTRL, fctrl);
 
-#if defined(NETIF_F_HW_VLAN_CTAG_FILTER)
+#if defined(HAVE_VLAN_RX_REGISTER) || defined(ESX55)
+	IXGBE_WRITE_REG(hw, IXGBE_VLNCTRL, vlnctrl);
+#else
+#ifdef NETIF_F_HW_VLAN_CTAG_FILTER
 	if (features & NETIF_F_HW_VLAN_CTAG_FILTER)
 		ixgbe_vlan_promisc_disable(adapter);
 	else
 		ixgbe_vlan_promisc_enable(adapter);
-#elif defined(NETIF_F_HW_VLAN_FILTER) && !defined(HAVE_VLAN_RX_REGISTER)
+#endif
+#ifdef NETIF_F_HW_VLAN_FILTER
 	if (features & NETIF_F_HW_VLAN_FILTER)
 		ixgbe_vlan_promisc_disable(adapter);
 	else
 		ixgbe_vlan_promisc_enable(adapter);
-#elif defined(HAVE_VLAN_RX_REGISTER) || defined(ESX55)
-	IXGBE_WRITE_REG(hw, IXGBE_VLNCTRL, vlnctrl);
-#endif /* NETIF_F_HW_VLAN_CTAG_FILTER */
+#endif
+#endif /* HAVE_VLAN_RX_REGISTER || ESX55 */
 
 #ifdef HAVE_VLAN_RX_REGISTER
 	ixgbe_vlan_mode(netdev, adapter->vlgrp);
