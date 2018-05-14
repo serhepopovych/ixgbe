@@ -4936,7 +4936,7 @@ static void ixgbe_vlan_rx_kill_vid(struct net_device *netdev, u16 vid)
  * ixgbe_vlan_strip_disable - helper to disable vlan tag stripping
  * @adapter: driver data
  */
-void ixgbe_vlan_strip_disable(struct ixgbe_adapter *adapter)
+static void ixgbe_vlan_strip_disable(struct ixgbe_adapter *adapter)
 {
 	struct ixgbe_hw *hw = &adapter->hw;
 	u32 vlnctrl;
@@ -4975,7 +4975,7 @@ void ixgbe_vlan_strip_disable(struct ixgbe_adapter *adapter)
  * ixgbe_vlan_strip_enable - helper to enable vlan tag stripping
  * @adapter: driver data
  */
-void ixgbe_vlan_strip_enable(struct ixgbe_adapter *adapter)
+static void ixgbe_vlan_strip_enable(struct ixgbe_adapter *adapter)
 {
 	struct ixgbe_hw *hw = &adapter->hw;
 	u32 vlnctrl;
