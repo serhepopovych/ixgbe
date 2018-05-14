@@ -1487,12 +1487,32 @@ static void ixgbe_rx_vlan(struct ixgbe_ring *ring,
 			  union ixgbe_adv_rx_desc *rx_desc,
 			  struct sk_buff *skb)
 {
+	struct net_device *netdev = ring->netdev;
+	struct ixgbe_adapter __maybe_unused *adapter = netdev_priv(netdev);
+	netdev_features_t __maybe_unused features = netdev->features;
+	int enable;
+
+#ifdef HAVE_VLAN_RX_REGISTER
+	enable = !!adapter->vlgrp;
+#if defined(HAVE_NDO_SET_FEATURES) || defined(ETHTOOL_GFLAGS)
 #ifdef NETIF_F_HW_VLAN_CTAG_RX
-	if ((netdev_ring(ring)->features & NETIF_F_HW_VLAN_CTAG_RX) &&
+	enable &= !!(features & NETIF_F_HW_VLAN_CTAG_RX);
 #else
-	if ((netdev_ring(ring)->features & NETIF_F_HW_VLAN_RX) &&
+	enable &= !!(features & NETIF_F_HW_VLAN_RX);
 #endif
-	    ixgbe_test_staterr(rx_desc, IXGBE_RXD_STAT_VP))
+#endif /* HAVE_NDO_SET_FEATURES || ETHTOOL_GFLAGS */
+#if IS_ENABLED(CONFIG_DCB)
+	enable |= (adapter->flags & IXGBE_FLAG_DCB_ENABLED);
+#endif /* CONFIG_DCB */
+#else /* !HAVE_VLAN_RX_REGISTER */
+#ifdef NETIF_F_HW_VLAN_CTAG_RX
+	enable = !!(features & NETIF_F_HW_VLAN_CTAG_RX);
+#else
+	enable = !!(features & NETIF_F_HW_VLAN_RX);
+#endif
+#endif /* HAVE_VLAN_RX_REGISTER */
+
+	if (enable && ixgbe_test_staterr(rx_desc, IXGBE_RXD_STAT_VP))
 #ifndef HAVE_VLAN_RX_REGISTER
 		__vlan_hwaccel_put_tag(skb,
 				       htons(ETH_P_8021Q),
@@ -5109,9 +5129,11 @@ void ixgbe_vlan_mode(struct net_device *netdev, netdev_features_t features)
 #endif
 {
 	struct ixgbe_adapter *adapter = netdev_priv(netdev);
-	bool enable;
+	int enable;
 
 #ifdef HAVE_VLAN_RX_REGISTER
+	netdev_features_t features = netdev->features;
+
 	if (!test_bit(__IXGBE_DOWN, &adapter->state))
 		ixgbe_irq_disable(adapter);
 
@@ -5120,13 +5142,23 @@ void ixgbe_vlan_mode(struct net_device *netdev, netdev_features_t features)
 	if (!test_bit(__IXGBE_DOWN, &adapter->state))
 		ixgbe_irq_enable(adapter, true, true);
 
-	enable = (grp || (adapter->flags & IXGBE_FLAG_DCB_ENABLED));
+	enable = !!grp;
+#if defined(HAVE_NDO_SET_FEATURES) || defined(ETHTOOL_GFLAGS)
+#ifdef NETIF_F_HW_VLAN_CTAG_RX
+	enable &= !!(features & NETIF_F_HW_VLAN_CTAG_RX);
 #else
+	enable &= !!(features & NETIF_F_HW_VLAN_RX);
+#endif
+#endif /* HAVE_NDO_SET_FEATURES || ETHTOOL_GFLAGS */
+#if IS_ENABLED(CONFIG_DCB)
+	enable |= (adapter->flags & IXGBE_FLAG_DCB_ENABLED);
+#endif /* CONFIG_DCB */
+#else /* !HAVE_VLAN_RX_REGISTER */
 #ifdef NETIF_F_HW_VLAN_CTAG_RX
 	enable = !!(features & NETIF_F_HW_VLAN_CTAG_RX);
 #else
 	enable = !!(features & NETIF_F_HW_VLAN_RX);
-#endif /* NETIF_F_HW_VLAN_CTAG_RX */
+#endif
 #endif /* HAVE_VLAN_RX_REGISTER */
 	if (enable)
 		/* enable VLAN tag insert/strip */
@@ -5134,6 +5166,26 @@ void ixgbe_vlan_mode(struct net_device *netdev, netdev_features_t features)
 	else
 		/* disable VLAN tag insert/strip */
 		ixgbe_vlan_strip_disable(adapter);
+
+#ifdef HAVE_VLAN_RX_REGISTER
+#if !defined(HAVE_NDO_SET_FEATURES) && !defined(ETHTOOL_GFLAGS)
+#ifdef NETIF_F_HW_VLAN_CTAG_RX
+	if (enable)
+		features |= NETIF_F_HW_VLAN_CTAG_RX;
+	else
+		features &= ~NETIF_F_HW_VLAN_CTAG_RX;
+#else
+	if (enable)
+		features |= NETIF_F_HW_VLAN_RX;
+	else
+		features &= ~NETIF_F_HW_VLAN_RX;
+#endif
+	if (netdev->features != features) {
+		netdev->features = features;
+		netdev_features_change(netdev);
+	}
+#endif /* !HAVE_NDO_SET_FEATURES && !ETHTOOL_GFLAGS */
+#endif /* HAVE_VLAN_RX_REGISTER */
 }
 
 static void ixgbe_restore_vlan(struct ixgbe_adapter *adapter)
