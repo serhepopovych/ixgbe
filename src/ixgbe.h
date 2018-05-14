@@ -1224,7 +1224,7 @@ int ixgbe_del_mac_filter(struct ixgbe_adapter *adapter,
 int ixgbe_available_rars(struct ixgbe_adapter *adapter, u16 pool);
 void ixgbe_update_pf_promisc_vlvf(struct ixgbe_adapter *adapter, u32 vid);
 #ifndef HAVE_VLAN_RX_REGISTER
-void ixgbe_vlan_mode(struct net_device *, u32);
+void ixgbe_vlan_mode(struct net_device *, netdev_features_t);
 #else
 #ifdef CONFIG_PCI_IOV
 int ixgbe_find_vlvf_entry(struct ixgbe_hw *hw, u32 vlan);
