@@ -1212,8 +1212,6 @@ void ixgbe_write_eitr(struct ixgbe_q_vector *q_vector);
 int ixgbe_poll(struct napi_struct *napi, int budget);
 void ixgbe_disable_rx_queue(struct ixgbe_adapter *adapter);
 void ixgbe_disable_tx_queue(struct ixgbe_adapter *adapter);
-void ixgbe_vlan_strip_enable(struct ixgbe_adapter *adapter);
-void ixgbe_vlan_strip_disable(struct ixgbe_adapter *adapter);
 #ifdef ETHTOOL_OPS_COMPAT
 int ethtool_ioctl(struct ifreq *ifr);
 #endif
