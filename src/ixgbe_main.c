@@ -5114,7 +5114,7 @@ static void ixgbe_vlan_promisc_disable(struct ixgbe_adapter *adapter)
 #ifdef HAVE_VLAN_RX_REGISTER
 static void ixgbe_vlan_mode(struct net_device *netdev, struct vlan_group *grp)
 #else
-void ixgbe_vlan_mode(struct net_device *netdev, u32 features)
+void ixgbe_vlan_mode(struct net_device *netdev, netdev_features_t features)
 #endif
 {
 	struct ixgbe_adapter *adapter = netdev_priv(netdev);
@@ -5149,9 +5149,6 @@ static void ixgbe_restore_vlan(struct ixgbe_adapter *adapter)
 {
 	u16 vid = 1;
 #ifdef HAVE_VLAN_RX_REGISTER
-
-	ixgbe_vlan_mode(adapter->netdev, adapter->vlgrp);
-
 	/*
 	 * add vlan ID 0 and enable vlan tag stripping so we
 	 * always accept priority-tagged traffic
@@ -5569,19 +5566,6 @@ void ixgbe_set_rx_mode(struct net_device *netdev)
 
 	IXGBE_WRITE_REG(hw, IXGBE_FCTRL, fctrl);
 
-#ifdef HAVE_VLAN_RX_REGISTER
-	if (adapter->vlgrp || (adapter->flags & IXGBE_FLAG_DCB_ENABLED))
-#else
-#ifdef NETIF_F_HW_VLAN_CTAG_RX
-	if (features & NETIF_F_HW_VLAN_CTAG_RX)
-#else
-	if (features & NETIF_F_HW_VLAN_RX)
-#endif /* NETIF_F_HW_VLAN_CTAG_RX */
-#endif /* HAVE_VLAN_RX_REGISTER */
-		ixgbe_vlan_strip_enable(adapter);
-	else
-		ixgbe_vlan_strip_disable(adapter);
-
 #if defined(NETIF_F_HW_VLAN_CTAG_FILTER)
 	if (features & NETIF_F_HW_VLAN_CTAG_FILTER)
 		ixgbe_vlan_promisc_disable(adapter);
@@ -5595,6 +5579,12 @@ void ixgbe_set_rx_mode(struct net_device *netdev)
 #elif defined(HAVE_VLAN_RX_REGISTER) || defined(ESX55)
 	IXGBE_WRITE_REG(hw, IXGBE_VLNCTRL, vlnctrl);
 #endif /* NETIF_F_HW_VLAN_CTAG_FILTER */
+
+#ifdef HAVE_VLAN_RX_REGISTER
+	ixgbe_vlan_mode(netdev, adapter->vlgrp);
+#else
+	ixgbe_vlan_mode(netdev, features);
+#endif
 }
 
 static void ixgbe_napi_enable_all(struct ixgbe_adapter *adapter)
