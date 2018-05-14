@@ -3201,11 +3201,10 @@ static int ixgbe_set_flags(struct net_device *netdev, u32 data)
 	bool need_reset = false;
 	int rc;
 
-#ifndef HAVE_VLAN_RX_REGISTER
+#if IS_ENABLED(CONFIG_DCB)
 	if ((adapter->flags & IXGBE_FLAG_DCB_ENABLED) &&
 	    !(data & ETH_FLAG_RXVLAN))
 		return -EINVAL;
-
 #endif
 	if (adapter->flags2 & IXGBE_FLAG2_RSC_CAPABLE)
 		supported_flags |= ETH_FLAG_LRO;
