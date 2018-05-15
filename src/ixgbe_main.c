@@ -5287,42 +5287,36 @@ void ixgbe_vlan_mode(struct net_device *netdev, netdev_features_t features)
 
 static void ixgbe_restore_vlan(struct ixgbe_adapter *adapter)
 {
+	struct net_device *netdev = adapter->netdev;
 	u16 vid = 1;
-#ifdef HAVE_VLAN_RX_REGISTER
+
 	/*
 	 * add vlan ID 0 and enable vlan tag stripping so we
 	 * always accept priority-tagged traffic
 	 */
 #ifdef NETIF_F_HW_VLAN_CTAG_RX
-	ixgbe_vlan_rx_add_vid(adapter->netdev, htons(ETH_P_8021Q), 0);
+	ixgbe_vlan_rx_add_vid(netdev, htons(ETH_P_8021Q), 0);
 #else
-	ixgbe_vlan_rx_add_vid(adapter->netdev, 0);
+	ixgbe_vlan_rx_add_vid(netdev, 0);
 #endif
+#ifdef HAVE_VLAN_RX_REGISTER
 	if (adapter->vlgrp) {
 		for (; vid < VLAN_N_VID; vid++) {
 			if (!vlan_group_get_device(adapter->vlgrp, vid))
 				continue;
 #ifdef NETIF_F_HW_VLAN_CTAG_RX
-			ixgbe_vlan_rx_add_vid(adapter->netdev,
-					      htons(ETH_P_8021Q), vid);
+			ixgbe_vlan_rx_add_vid(netdev, htons(ETH_P_8021Q), vid);
 #else
-			ixgbe_vlan_rx_add_vid(adapter->netdev, vid);
+			ixgbe_vlan_rx_add_vid(netdev, vid);
 #endif
 		}
 	}
 #else /* !HAVE_VLAN_RX_REGISTER */
-
-#ifdef NETIF_F_HW_VLAN_CTAG_RX
-	ixgbe_vlan_rx_add_vid(adapter->netdev, htons(ETH_P_8021Q), 0);
-#else
-	ixgbe_vlan_rx_add_vid(adapter->netdev, 0);
-#endif
-
 	for_each_set_bit_from(vid, adapter->active_vlans, VLAN_N_VID)
 #ifdef NETIF_F_HW_VLAN_CTAG_RX
-		ixgbe_vlan_rx_add_vid(adapter->netdev, htons(ETH_P_8021Q), vid);
+		ixgbe_vlan_rx_add_vid(netdev, htons(ETH_P_8021Q), vid);
 #else
-		ixgbe_vlan_rx_add_vid(adapter->netdev, vid);
+		ixgbe_vlan_rx_add_vid(netdev, vid);
 #endif
 #endif /* HAVE_VLAN_RX_REGISTER */
 }
