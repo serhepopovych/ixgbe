@@ -1,0 +1,12 @@
+
+Note for RHEL6/CentOS6/SL6
+--------------------------
+
+In RHEL6 and it's derivates (e.g CentOS, Scientific Linux) iproute package does
+not have netns subcommand while kernel supports network namespaces. To overcome
+this limitation you can rebuild (e.g. using mock) iproute-3.3.0-2.fc17.src.rpm
+from Fedora 17 and install on target system.
+
+Note that even with ip-netns(8) subcommand support kernel does not support
+moving real network devices to network namespace other than initial: create
+vlans in network namespace for */vlan.conf tests not moving real ones.
