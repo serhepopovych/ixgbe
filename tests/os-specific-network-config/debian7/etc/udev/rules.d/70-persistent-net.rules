@@ -1,0 +1,13 @@
+# To install these rules to system replace all <x_enXX_mac_addr> templates
+# with real MAC address values and issue command:
+#
+#   cat <this_file> >>/etc/udev/rules.d/70-persistent-net.rules
+#
+
+# ixgbe
+SUBSYSTEM=="net", ACTION=="add", DRIVERS=="?*", ATTR{address}=="<x_en10_mac_addr>", ATTR{dev_id}=="0x0", ATTR{type}=="1", KERNEL=="*", NAME="en10"
+SUBSYSTEM=="net", ACTION=="add", DRIVERS=="?*", ATTR{address}=="<x_en20_mac_addr>", ATTR{dev_id}=="0x0", ATTR{type}=="1", KERNEL=="*", NAME="en20"
+
+# igb
+SUBSYSTEM=="net", ACTION=="add", DRIVERS=="?*", ATTR{address}=="<x_en30_mac_addr>", ATTR{dev_id}=="0x0", ATTR{type}=="1", KERNEL=="*", NAME="en30"
+SUBSYSTEM=="net", ACTION=="add", DRIVERS=="?*", ATTR{address}=="<x_en40_mac_addr>", ATTR{dev_id}=="0x0", ATTR{type}=="1", KERNEL=="*", NAME="en40"

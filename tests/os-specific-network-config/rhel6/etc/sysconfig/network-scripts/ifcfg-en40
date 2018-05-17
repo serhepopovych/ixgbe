@@ -1,0 +1,18 @@
+ONBOOT=yes
+UUID=f73f2cb9-4e2e-4b31-ab4b-57e369eaca10
+NAME=en40
+DEVICE=en40
+TYPE=Ethernet
+HWADDR=<x_en40_mac_addr>
+BOOTPROTO=none
+MTU=1504
+#ETHTOOL_OPTS='--set-priv-flags en40 vlan-stag-rx on'
+
+# IPv4
+NOZEROCONF=yes
+ARPCHECK=no
+
+# IPv6
+IPV6INIT=no
+IPV6FORWARDING=no
+IPV6_AUTOCONF=no
