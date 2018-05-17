@@ -1,0 +1,18 @@
+ONBOOT=yes
+UUID=ff6636ac-d017-4dbe-bc7c-1e86e5703f2a
+NAME=en30
+DEVICE=en30
+TYPE=Ethernet
+HWADDR=<x_en30_mac_addr>
+BOOTPROTO=none
+MTU=1504
+#ETHTOOL_OPTS='--set-priv-flags en30 vlan-stag-rx on'
+
+# IPv4
+NOZEROCONF=yes
+ARPCHECK=no
+
+# IPv6
+IPV6INIT=no
+IPV6FORWARDING=no
+IPV6_AUTOCONF=no
