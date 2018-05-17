@@ -1,0 +1,18 @@
+ONBOOT=yes
+UUID=4586a51d-13af-43c0-8463-230cc2e4cd1b
+NAME=en20
+DEVICE=en20
+TYPE=Ethernet
+HWADDR=<x_en20_mac_addr>
+BOOTPROTO=none
+MTU=1504
+#ETHTOOL_OPTS='--set-priv-flags en20 vlan-stag-rx on'
+
+# IPv4
+NOZEROCONF=yes
+ARPCHECK=no
+
+# IPv6
+IPV6INIT=no
+IPV6FORWARDING=no
+IPV6_AUTOCONF=no

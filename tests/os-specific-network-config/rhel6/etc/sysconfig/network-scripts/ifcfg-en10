@@ -1,0 +1,18 @@
+ONBOOT=yes
+UUID=1e3c3f0b-e63a-4a54-a045-c085f4426eb6
+NAME=en10
+DEVICE=en10
+TYPE=Ethernet
+HWADDR=<x_en10_mac_addr>
+BOOTPROTO=none
+MTU=1504
+#ETHTOOL_OPTS='--set-priv-flags en10 vlan-stag-rx on'
+
+# IPv4
+NOZEROCONF=yes
+ARPCHECK=no
+
+# IPv6
+IPV6INIT=no
+IPV6FORWARDING=no
+IPV6_AUTOCONF=no
