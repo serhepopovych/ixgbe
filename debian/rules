@@ -1,0 +1,18 @@
+#!/usr/bin/make -f
+
+#export DH_VERBOSE=1
+
+VERSION	:= $(shell dpkg-parsechangelog | sed -nr '/^Version:/s/Version: (.*:)?(.*)-(.*)/\2/p')
+
+%:
+	dh $@ --with dkms,quilt
+
+override_dh_install:
+	dh_install src/*.c src/*.h src/Makefile src/common.mk usr/src/ixgbe-$(VERSION)/
+	find debian/ixgbe-dkms/usr/src -type f -perm -5 -print0 2>/dev/null | xargs -0r chmod a-X
+
+override_dh_dkms:
+	dh_dkms -V $(VERSION)
+
+# do nothing
+override_dh_auto_configure override_dh_auto_build override_dh_auto_test override_dh_auto_install override_dh_auto_clean:
