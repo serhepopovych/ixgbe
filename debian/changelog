@@ -1,0 +1,5 @@
+ixgbe (5.7.1-netctl-1) unstable; urgency=medium
+
+  * Initial release. (Closes: #123456)
+
+ -- Serhey Popovych <serhe.popovych@gmail.com>  Mon, 06 Jul 2020 20:20:45 +0200
