@@ -1,0 +1,5 @@
+# Adjust and uncomment options line below to enable unsupported SFPs
+#
+# See ixgbe(7) for more information on available parameters.
+
+#options ixgbe allow_unsupported_sfp=1,1
