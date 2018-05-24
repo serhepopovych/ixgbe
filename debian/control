@@ -1,0 +1,21 @@
+Source: ixgbe
+Section: kernel
+Priority: extra
+Maintainer: Serhey Popovych <serhe.popovych@gmail.com>
+Build-Depends: debhelper (>= 9), dkms
+Standards-Version: 5.13.4
+Homepage: https://github.com/serhepopovych/ixgbe
+Vcs-Git: https://github.com/serhepopovych/ixgbe.git
+Vcs-Browser: https://github.com/serhepopovych/ixgbe
+
+Package: ixgbe-dkms
+Architecture: all
+Depends: ${misc:Depends}
+Description: dkms source for the out of Linux Kernel tree ixgbe driver
+ This is Intel 10GbE Ethernet Controller out of tree ixgbe driver.
+ .
+ Installation of the ixgbe-dkms package will disable the in-kernel ixgbe
+ module. To re-enable them, the ixgbe-dkms package must be purged.
+ .
+ This package provides the dkms source code for the ixgbe kernel module.
+ Kernel source or headers are required to compile these modules.
