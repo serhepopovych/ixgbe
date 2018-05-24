@@ -58,3 +58,14 @@ series
 *.orig
 *~
 \#*#
+
+# Git files and directories we do not want to ignore
+!/debian/source/
+!/debian/patches/
+
+!/debian/*-dkms.conf
+!/debian/*-dkms.dkms
+!/debian/*-dkms.docs
+!/debian/*-dkms.install
+!/debian/*-dkms.manpages
+!/debian/*-dkms.modprobe
