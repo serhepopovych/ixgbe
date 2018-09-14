@@ -5555,10 +5555,6 @@ static inline void _kc_napi_complete_done(struct napi_struct *napi,
 #define napi_complete_done _kc_napi_complete_done
 #endif
 
-int _kc_bitmap_print_to_pagebuf(bool list, char *buf,
-				const unsigned long *maskp, int nmaskbits);
-#define bitmap_print_to_pagebuf _kc_bitmap_print_to_pagebuf
-
 #ifndef NETDEV_RSS_KEY_LEN
 #define NETDEV_RSS_KEY_LEN (13 * 4)
 #define netdev_rss_key_fill(buffer, len) __kc_netdev_rss_key_fill(buffer, len)
