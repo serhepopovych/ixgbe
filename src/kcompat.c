@@ -2391,22 +2391,6 @@ void __kc_netdev_rss_key_fill(void *buffer, size_t len)
 	memcpy(buffer, seed, len);
 }
 #endif
-
-int _kc_bitmap_print_to_pagebuf(bool list, char *buf,
-				const unsigned long *maskp,
-				int nmaskbits)
-{
-	ptrdiff_t len = PTR_ALIGN(buf + PAGE_SIZE - 1, PAGE_SIZE) - buf - 2;
-	int n = 0;
-
-	if (len > 1) {
-		n = list ? bitmap_scnlistprintf(buf, len, maskp, nmaskbits) :
-			   bitmap_scnprintf(buf, len, maskp, nmaskbits);
-		buf[n++] = '\n';
-		buf[n] = '\0';
-	}
-	return n;
-}
 #endif
 
 /******************************************************************************/
