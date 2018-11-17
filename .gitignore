@@ -46,7 +46,6 @@
 modules.order
 Module.symvers
 Mkfile.old
-dkms.conf
 
 # stgit generated dirs
 patches-*
@@ -69,3 +68,7 @@ series
 !/debian/*-dkms.install
 !/debian/*-dkms.manpages
 !/debian/*-dkms.modprobe
+
+!/dkms/dkms.conf
+!/dkms/dkms.depmod
+!/dkms/dkms.modprobe
