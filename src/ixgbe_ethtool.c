@@ -2651,11 +2651,7 @@ static u16 ixgbe_clean_test_rings(struct ixgbe_ring *rx_ring,
 				  unsigned int size)
 {
 	union ixgbe_adv_rx_desc *rx_desc;
-#ifdef CONFIG_IXGBE_DISABLE_PACKET_SPLIT
-	const int bufsz = rx_ring->rx_buf_len;
-#else
 	const int bufsz = ixgbe_rx_bufsz(rx_ring);
-#endif
 	u16 rx_ntc, tx_ntc, count = 0;
 
 	/* initialize next to clean and descriptor values */
