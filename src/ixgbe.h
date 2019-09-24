@@ -306,20 +306,15 @@ struct ixgbe_tx_buffer {
 };
 
 struct ixgbe_rx_buffer {
-#ifndef HAVE_MEM_TYPE_XSK_BUFF_POOL
-	struct sk_buff *skb;
-	dma_addr_t dma;
-#endif
-#ifndef CONFIG_IXGBE_DISABLE_PACKET_SPLIT
 	union {
 		struct {
-#ifdef HAVE_MEM_TYPE_XSK_BUFF_POOL
 			struct sk_buff *skb;
 			dma_addr_t dma;
-#endif
+#ifndef CONFIG_IXGBE_DISABLE_PACKET_SPLIT
 			struct page *page;
 			__u32 page_offset;
 			__u16 pagecnt_bias;
+#endif
 		};
 #ifdef HAVE_AF_XDP_ZC_SUPPORT
 		struct {
@@ -333,7 +328,6 @@ struct ixgbe_rx_buffer {
 		};
 #endif
 	};
-#endif /* CONFIG_IXGBE_DISABLE_PACKET_SPLIT */
 };
 
 struct ixgbe_queue_stats {
@@ -383,9 +377,10 @@ enum ixgbe_ring_state_t {
 #endif
 };
 #ifndef CONFIG_IXGBE_DISABLE_PACKET_SPLIT
-
 #define ring_uses_build_skb(ring) \
 	test_bit(__IXGBE_RX_BUILD_SKB_ENABLED, &(ring)->state)
+#else
+#define ring_uses_build_skb(ring) (0)
 #endif
 
 #define check_for_tx_hang(ring) \
@@ -436,25 +431,21 @@ struct ixgbe_ring {
 					 */
 	u16 next_to_use;
 	u16 next_to_clean;
-
-#ifdef HAVE_PTP_1588_CLOCK
-	unsigned long last_rx_timestamp;
-
-#endif
+	u16 rx_buf_len;
 	union {
-#ifdef CONFIG_IXGBE_DISABLE_PACKET_SPLIT
-		u16 rx_buf_len;
-#else
 		union {
 			u16 next_to_alloc;
 			u16 next_rs_idx;
 		};
-#endif
 		struct {
 			u8 atr_sample_rate;
 			u8 atr_count;
 		};
 	};
+
+#ifdef HAVE_PTP_1588_CLOCK
+	unsigned long last_rx_timestamp;
+#endif
 
 #ifdef HAVE_XDP_SUPPORT
 #ifdef HAVE_AF_XDP_ZC_SUPPORT
@@ -483,7 +474,6 @@ struct ixgbe_ring {
 	struct zero_copy_allocator zca; /* ZC allocator anchor */
 #endif
 	u16 ring_idx;           /* {rx,tx,xdp}_ring back reference idx */
-	u16 rx_buf_len;
 #endif
 #endif
 } ____cacheline_internodealigned_in_smp;
@@ -562,6 +552,12 @@ static inline unsigned int ixgbe_rx_bufsz(struct ixgbe_ring *ring)
 	return ring->rx_buf_len;
 }
 #endif
+
+static inline unsigned int ixgbe_rx_offset(struct ixgbe_ring *rx_ring)
+{
+	return ring_uses_build_skb(rx_ring) ? IXGBE_SKB_PAD : 0;
+}
+
 #define IXGBE_ITR_ADAPTIVE_MIN_INC	2
 #define IXGBE_ITR_ADAPTIVE_MIN_USECS	10
 #define IXGBE_ITR_ADAPTIVE_MAX_USECS	84
