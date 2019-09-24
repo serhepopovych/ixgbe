@@ -494,8 +494,8 @@ bool ixgbe_alloc_rx_buffers_zc(struct ixgbe_ring *rx_ring, u16 count)
 #ifndef HAVE_MEM_TYPE_XSK_BUFF_POOL
 		/* sync the buffer for use by the device */
 		dma_sync_single_range_for_device(rx_ring->dev, bi->dma,
-						 bi->page_offset,
-						 rx_ring->rx_buf_len,
+						 ixgbe_rx_offset(rx_ring),
+						 ixgbe_rx_bufsz(rx_ring),
 						 DMA_BIDIRECTIONAL);
 #else
 		dma = xsk_buff_xdp_get_dma(bi->xdp);
