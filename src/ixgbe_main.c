@@ -7687,6 +7687,7 @@ static int ixgbe_change_mtu(struct net_device *netdev, int new_mtu)
 	int max_frame = new_mtu + ETH_HLEN + ETH_FCS_LEN;
 #endif
 
+#ifdef HAVE_XDP_SUPPORT
 	if (adapter->xdp_prog) {
 		int new_frame_size = new_mtu + ETH_HLEN + ETH_FCS_LEN +
 				     VLAN_HLEN;
@@ -7694,13 +7695,18 @@ static int ixgbe_change_mtu(struct net_device *netdev, int new_mtu)
 
 		for (i = 0; i < adapter->num_rx_queues; i++) {
 			struct ixgbe_ring *ring = adapter->rx_ring[i];
-
-			if (new_frame_size > ixgbe_rx_bufsz(ring)) {
+#ifdef CONFIG_IXGBE_DISABLE_PACKET_SPLIT
+			const int bufsz = ring->rx_buf_len;
+#else
+			const int bufsz = ixgbe_rx_bufsz(ring);
+#endif
+			if (new_frame_size > bufsz) {
 				e_warn(probe, "Requested MTU size is not supported with XDP\n");
 				return -EINVAL;
 			}
 		}
 	}
+#endif
 
 #ifndef HAVE_NETDEVICE_MIN_MAX_MTU
 	/* MTU < 68 is an error and causes problems on some kernels */
