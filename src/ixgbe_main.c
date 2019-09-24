@@ -1220,11 +1220,6 @@ static bool ixgbe_alloc_mapped_skb(struct ixgbe_ring *rx_ring,
 }
 
 #else /* !CONFIG_IXGBE_DISABLE_PACKET_SPLIT */
-static unsigned int ixgbe_rx_offset(struct ixgbe_ring *rx_ring)
-{
-	return ring_uses_build_skb(rx_ring) ? IXGBE_SKB_PAD : 0;
-}
-
 static bool ixgbe_alloc_mapped_page(struct ixgbe_ring *rx_ring,
 				    struct ixgbe_rx_buffer *bi)
 {
@@ -1294,9 +1289,6 @@ void ixgbe_alloc_rx_buffers(struct ixgbe_ring *rx_ring, u16 cleaned_count)
 	union ixgbe_adv_rx_desc *rx_desc;
 	struct ixgbe_rx_buffer *bi;
 	u16 i = rx_ring->next_to_use;
-#ifndef CONFIG_IXGBE_DISABLE_PACKET_SPLIT
-	u16 bufsz;
-#endif
 
 	/* nothing to do */
 	if (!cleaned_count)
@@ -1305,10 +1297,6 @@ void ixgbe_alloc_rx_buffers(struct ixgbe_ring *rx_ring, u16 cleaned_count)
 	rx_desc = IXGBE_RX_DESC(rx_ring, i);
 	bi = &rx_ring->rx_buffer_info[i];
 	i -= rx_ring->count;
-#ifndef CONFIG_IXGBE_DISABLE_PACKET_SPLIT
-
-	bufsz = ixgbe_rx_bufsz(rx_ring);
-#endif
 
 	do {
 #ifdef CONFIG_IXGBE_DISABLE_PACKET_SPLIT
@@ -1320,7 +1308,7 @@ void ixgbe_alloc_rx_buffers(struct ixgbe_ring *rx_ring, u16 cleaned_count)
 
 		/* sync the buffer for use by the device */
 		dma_sync_single_range_for_device(rx_ring->dev, bi->dma,
-						 bi->page_offset, bufsz,
+						 bi->page_offset, ixgbe_rx_bufsz(rx_ring),
 						 DMA_FROM_DEVICE);
 #endif
 
@@ -6401,6 +6389,8 @@ skip_free:
 	rx_ring->next_to_alloc = 0;
 	rx_ring->next_to_clean = 0;
 	rx_ring->next_to_use = 0;
+#else
+	;
 #endif
 }
 
@@ -7837,6 +7827,7 @@ static int ixgbe_change_mtu(struct net_device *netdev, int new_mtu)
 	int max_frame = new_mtu + ETH_HLEN + ETH_FCS_LEN;
 #endif
 
+#ifdef HAVE_XDP_SUPPORT
 	if (adapter->xdp_prog) {
 		int new_frame_size = new_mtu + IXGBE_PKT_HDR_PAD;
 		int i;
@@ -7850,6 +7841,7 @@ static int ixgbe_change_mtu(struct net_device *netdev, int new_mtu)
 			}
 		}
 	}
+#endif
 
 #ifndef HAVE_NETDEVICE_MIN_MAX_MTU
 	/* MTU < 68 is an error and causes problems on some kernels */
