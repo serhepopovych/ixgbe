@@ -11830,11 +11830,15 @@ static int ixgbe_xdp_setup(struct net_device *dev, struct bpf_prog *prog)
 	/* verify ixgbe ring attributes are sufficient for XDP */
 	for (i = 0; i < adapter->num_rx_queues; i++) {
 		struct ixgbe_ring *ring = adapter->rx_ring[i];
-
+#ifdef CONFIG_IXGBE_DISABLE_PACKET_SPLIT
+		const int bufsz = ring->rx_buf_len;
+#else
+		const int bufsz = ixgbe_rx_bufsz(ring);
+#endif
 		if (ring_is_rsc_enabled(ring))
 			return -EINVAL;
 
-		if (frame_size > ixgbe_rx_bufsz(ring))
+		if (frame_size > bufsz)
 			return -EINVAL;
 	}
 
