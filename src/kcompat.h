@@ -6862,12 +6862,13 @@ _kc_dev_change_flags(struct net_device *netdev, unsigned int flags,
 
 /*****************************************************************************/
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5,2,0))
-#if (defined HAVE_SKB_XMIT_MORE) && \
-(!(RHEL_RELEASE_CODE && (RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(8,2))))
+#if (!(RHEL_RELEASE_CODE && (RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(8,2))))
+#if defined(HAVE_SKB_XMIT_MORE)
 #define netdev_xmit_more()	(skb->xmit_more)
 #else
 #define netdev_xmit_more()	(0)
-#endif
+#endif /* skb->xmit_more */
+#endif /* !RHEL >= 8.2 */
 
 #if (!(RHEL_RELEASE_CODE && (RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(8,2))))
 #ifndef eth_get_headlen
