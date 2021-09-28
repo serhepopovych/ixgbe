@@ -5455,9 +5455,7 @@ static inline void ktime_get_ts64(struct timespec64 *ts)
 #if (RHEL_RELEASE_CODE < RHEL_RELEASE_VERSION(7,5))
 #endif /* RHEL_RELEASE_CODE < RHEL7.5 */
 
-#if RHEL_RELEASE_CODE && \
-	RHEL_RELEASE_CODE > RHEL_RELEASE_VERSION(6,3) && \
-	RHEL_RELEASE_CODE < RHEL_RELEASE_VERSION(7,3)
+#if !(RHEL_RELEASE_CODE && RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(7,3))
 static inline u64 ktime_get_ns(void)
 {
 	return ktime_to_ns(ktime_get());
