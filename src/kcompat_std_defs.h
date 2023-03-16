@@ -39,18 +39,6 @@
 #endif /* 3,10,0 */
 
 /*****************************************************************************/
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,17,0))
-#define NEED_DEVM_KASPRINTF
-#else /* >= 3,17,0 */
-#endif /* 3,17,0 */
-
-/*****************************************************************************/
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,18,0))
-#define NEED_DEV_PM_DOMAIN_ATTACH_DETACH
-#else /* >= 3,18,0 */
-#endif /* 3,18,0 */
-
-/*****************************************************************************/
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3,19,0))
 #define NEED_DEV_PRINTK_ONCE
 #else /* >= 3,19,0 */
@@ -245,7 +233,6 @@
 #define NEED_DEVLINK_PORT_ATTRS_SET_STRUCT
 #define HAVE_XDP_QUERY_PROG
 #define NEED_INDIRECT_CALL_3_AND_4
-#define NEED_MUL_U64_U64_DIV_U64
 #else /* >= 5.9.0 */
 #define HAVE_TASKLET_SETUP
 #endif /* 5.9.0 */

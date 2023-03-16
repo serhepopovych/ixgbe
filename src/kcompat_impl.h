@@ -712,34 +712,6 @@ _kc_bus_find_device(struct bus_type *type, struct device *start,
 	_kc_bus_find_device(type, start, data, match)
 #endif /* NEED_BUS_FIND_DEVICE_CONST_DATA */
 
-#ifdef NEED_DEV_PM_DOMAIN_ATTACH_DETACH
-#include <linux/acpi.h>
-/* NEED_DEV_PM_DOMAIN_ATTACH_DETACH
- *
- * dev_pm_domain_attach() and dev_pm_domain_detach() were added in upstream
- * commit 46420dd73b80 ("PM / Domains: Add APIs to attach/detach a PM domain for
- * a device"). To support older kernels and OSVs that don't have these API, just
- * implement how older versions worked by directly calling acpi_dev_pm_attach()
- * and acpi_dev_pm_detach().
- */
-static inline int dev_pm_domain_attach(struct device *dev, bool power_on)
-{
-	if (dev->pm_domain)
-		return 0;
-
-	if (ACPI_HANDLE(dev))
-		return acpi_dev_pm_attach(dev, true);
-
-	return 0;
-}
-
-static inline void dev_pm_domain_detach(struct device *dev, bool power_off)
-{
-	if (ACPI_HANDLE(dev))
-		acpi_dev_pm_detach(dev, true);
-}
-#endif /* NEED_DEV_PM_DOMAIN_ATTACH_DETACH */
-
 #ifdef NEED_CPU_LATENCY_QOS_RENAME
 /* NEED_CPU_LATENCY_QOS_RENAME
  *
@@ -961,19 +933,6 @@ static inline void eth_hw_addr_set(struct net_device *dev, const u8 *addr)
 #endif /* CONFIG_RETPOLINE */
 #endif /* NEED_EXPORT_INDIRECT_CALLABLE */
 
-#ifdef NEED_DEVM_KASPRINTF
-/* NEED_DEVM_KASPRINTF
- *
- * devm_kvasprintf and devm_kasprintf were added by commit
- * 75f2a4ead5d5 ("devres: Add devm_kasprintf and devm_kvasprintf API")
- * in Linux 3.17.
- */
-__printf(3, 0) char *devm_kvasprintf(struct device *dev, gfp_t gfp,
-				     const char *fmt, va_list ap);
-__printf(3, 4) char *devm_kasprintf(struct device *dev, gfp_t gfp,
-				    const char *fmt, ...);
-#endif /* NEED_DEVM_KASPRINTF */
-
 #ifdef NEED_XSK_UMEM_GET_RX_FRAME_SIZE
 #ifdef HAVE_AF_XDP_ZC_SUPPORT
 #ifndef xsk_umem_get_rx_frame_size
@@ -1024,15 +983,6 @@ _kc_xsk_buff_dma_sync_for_cpu(struct xdp_buff *xdp,
 int _kc_pci_iov_vf_id(struct pci_dev *dev);
 #define pci_iov_vf_id _kc_pci_iov_vf_id
 #endif /* NEED_PCI_IOV_VF_ID */
-
-/* NEED_MUL_U64_U64_DIV_U64
- *
- * mul_u64_u64_div_u64 was introduced in Linux 5.9 as part of commit
- * 3dc167ba5729 ("sched/cputime: Improve cputime_adjust()")
- */
-#ifdef NEED_MUL_U64_U64_DIV_U64
-u64 mul_u64_u64_div_u64(u64 a, u64 mul, u64 div);
-#endif /* NEED_MUL_U64_U64_DIV_U64 */
 
 #ifndef HAVE_LINKMODE
 static inline void linkmode_set_bit(int nr, volatile unsigned long *addr)

@@ -29,7 +29,6 @@
 #define NEED_NETDEV_TXQ_BQL_PREFETCH
 #else /* >= 7.3 */
 #undef NEED_DEV_PRINTK_ONCE
-#undef NEED_DEVM_KASPRINTF
 #define HAVE_DEVLINK_PORT_SPLIT
 #endif /* 7.3 */
 
@@ -72,17 +71,6 @@
 #if (RHEL_RELEASE_CODE < RHEL_RELEASE_VERSION(7,8))
 #else /* >= 7.8 */
 #endif /* 7.8 */
-
-/*****************************************************************************/
-#if (RHEL_RELEASE_CODE < RHEL_RELEASE_VERSION(7,9))
-#else /* >= 7.9 */
-/* mul_u64_u64_div_u64 was backported into RHEL 7.9 but not into the early
- * 8.x releases
- */
-#if (RHEL_RELEASE_CODE < RHEL_RELEASE_VERSION(8,0))
-#undef NEED_MUL_U64_U64_DIV_U64
-#endif /* < 8.0 */
-#endif /* 7.9 */
 
 /*****************************************************************************/
 #if (RHEL_RELEASE_CODE < RHEL_RELEASE_VERSION(8,0))
@@ -141,7 +129,6 @@
 #define HAVE_DEVLINK_REGION_OPS_SNAPSHOT
 #define HAVE_DEVLINK_RELOAD_ENABLE_DISABLE
 #undef NEED_DEVLINK_REGION_CREATE_OPS
-#undef NEED_MUL_U64_U64_DIV_U64
 #endif /* 8.3 */
 
 /*****************************************************************************/

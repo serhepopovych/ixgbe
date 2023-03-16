@@ -2925,40 +2925,6 @@ u64 _kc_pci_get_dsn(struct pci_dev *dev)
 }
 #endif /* 5.7.0 */
 
-#ifdef NEED_DEVM_KASPRINTF
-char *devm_kvasprintf(struct device *dev, gfp_t gfp, const char *fmt,
-		      va_list ap)
-{
-	unsigned int len;
-	char *p;
-	va_list aq;
-
-	va_copy(aq, ap);
-	len = vsnprintf(NULL, 0, fmt, aq);
-	va_end(aq);
-
-	p = devm_kmalloc(dev, len + 1, gfp);
-	if (!p)
-		return NULL;
-
-	vsnprintf(p, len + 1, fmt, ap);
-
-	return p;
-}
-
-char *devm_kasprintf(struct device *dev, gfp_t gfp, const char *fmt, ...)
-{
-	va_list ap;
-	char *p;
-
-	va_start(ap, fmt);
-	p = devm_kvasprintf(dev, gfp, fmt, ap);
-	va_end(ap);
-
-	return p;
-}
-#endif /* NEED_DEVM_KASPRINTF */
-
 #ifdef NEED_PCI_IOV_VF_ID
 #ifdef CONFIG_PCI_IOV
 /*
@@ -3013,44 +2979,3 @@ int _kc_pci_iov_vf_id(struct pci_dev *dev)
 }
 #endif /* CONFIG_PCI_IOV */
 #endif /* NEED_PCI_IOV_VF_ID */
-
-#ifdef NEED_MUL_U64_U64_DIV_U64
-u64 mul_u64_u64_div_u64(u64 a, u64 b, u64 c)
-{
-	u64 res = 0, div, rem;
-	int shift;
-
-	/* can a * b overflow ? */
-	if (ilog2(a) + ilog2(b) > 62) {
-		/*
-		 * (b * a) / c is equal to
-		 *
-		 *      (b / c) * a +
-		 *      (b % c) * a / c
-		 *
-		 * if nothing overflows. Can the 1st multiplication
-		 * overflow? Yes, but we do not care: this can only
-		 * happen if the end result can't fit in u64 anyway.
-		 *
-		 * So the code below does
-		 *
-		 *      res = (b / c) * a;
-		 *      b = b % c;
-		 */
-		div = div64_u64_rem(b, c, &rem);
-		res = div * a;
-		b = rem;
-
-		shift = ilog2(a) + ilog2(b) - 62;
-		if (shift > 0) {
-			/* drop precision */
-			b >>= shift;
-			c >>= shift;
-			if (!c)
-				return res;
-		}
-	}
-
-	return res + div64_u64(a * b, c);
-}
-#endif /* NEED_MUL_U64_U64_DIV_U64 */
