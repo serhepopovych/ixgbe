@@ -953,6 +953,24 @@ cpu_latency_qos_remove_request(struct pm_qos_request *req)
 }
 #endif /* NEED_CPU_LATENCY_QOS_RENAME */
 
+#ifdef NEED_STATIC_KEY
+/* NEED_STATIC_KEY
+ *
+ * struct static_key and supplementary macroses was added by upstream commit
+ * c5905afb0ee6 ("static keys: Introduce 'struct static_key',
+ * static_key_true()/false() and static_key_slow_[inc|dec]()")
+ *
+ * The definition is now necessary to handle
+ * the xdpdrv work with more than 64 cpus
+ */
+
+#define STATIC_KEY_INIT_FALSE JUMP_LABEL_INIT
+#define static_key_enabled jump_label_enabled
+#define static_key jump_label_key
+#define static_key_slow_inc jump_label_inc
+#define static_key_slow_dec jump_label_dec
+#endif /* NEED_STATIC_KEY */
+
 #ifdef NEED_DECLARE_STATIC_KEY_FALSE
 /* NEED_DECLARE_STATIC_KEY_FALSE
  *
