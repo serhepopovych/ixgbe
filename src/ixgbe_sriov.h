@@ -54,12 +54,14 @@ int ixgbe_ndo_set_vf_spoofchk(struct net_device *netdev, int vf, bool setting);
 #endif
 #ifdef HAVE_NDO_SET_VF_LINK_STATE
 int ixgbe_ndo_set_vf_link_state(struct net_device *netdev, int vf, int state);
+void ixgbe_set_vf_link_state(struct ixgbe_adapter *adapter, int vf, int state);
+#else
+#define ixgbe_set_vf_link_state(adapter, vf, state) do {} while (0)
 #endif
 int ixgbe_pci_sriov_configure(struct pci_dev *dev, int num_vfs);
 #ifdef IFLA_VF_MAX
 void ixgbe_check_vf_rate_limit(struct ixgbe_adapter *adapter);
 #endif /* IFLA_VF_MAX */
-void ixgbe_set_vf_link_state(struct ixgbe_adapter *adapter, int vf, int state);
 void ixgbe_dump_registers(struct ixgbe_adapter *adapter);
 
 /*
