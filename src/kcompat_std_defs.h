@@ -34,9 +34,9 @@
 /*****************************************************************************/
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0))
 #else /* >= 3,10,0 */
-#define NEED_NETIF_NAPI_ADD_NO_WEIGHT
 #define NEED_ETHTOOL_SPRINTF
 #endif /* 3,10,0 */
+#define NEED_NETIF_NAPI_ADD_NO_WEIGHT
 
 /*****************************************************************************/
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3,19,0))
