@@ -884,45 +884,6 @@ _kc_bus_find_device(struct bus_type *type, struct device *start,
 	_kc_bus_find_device(type, start, data, match)
 #endif /* NEED_BUS_FIND_DEVICE_CONST_DATA */
 
-#if defined(NEED_DEV_PM_DOMAIN_ATTACH) && defined(NEED_DEV_PM_DOMAIN_DETACH)
-#include <linux/acpi.h>
-/* NEED_DEV_PM_DOMAIN_ATTACH and NEED_DEV_PM_DOMAIN_DETACH
- *
- * dev_pm_domain_attach() and dev_pm_domain_detach() were added in upstream
- * commit 46420dd73b80 ("PM / Domains: Add APIs to attach/detach a PM domain for
- * a device"). To support older kernels and OSVs that don't have these API, just
- * implement how older versions worked by directly calling acpi_dev_pm_attach()
- * and acpi_dev_pm_detach().
- */
-static inline int dev_pm_domain_attach(struct device *dev, bool power_on)
-{
-	if (dev->pm_domain)
-		return 0;
-
-	if (ACPI_HANDLE(dev))
-		return acpi_dev_pm_attach(dev, true);
-
-	return 0;
-}
-
-static inline void dev_pm_domain_detach(struct device *dev, bool power_off)
-{
-	if (ACPI_HANDLE(dev))
-		acpi_dev_pm_detach(dev, true);
-}
-#else /* NEED_DEV_PM_DOMAIN_ATTACH && NEED_DEV_PM_DOMAIN_DETACH */
-/* it doesn't make sense to compat only one of these functions, and it is
- * likely either a failure in kcompat-generator.sh or a failed distribution
- * backport if this occurs. Don't try to support it.
- */
-#ifdef NEED_DEV_PM_DOMAIN_ATTACH
-#error "NEED_DEV_PM_DOMAIN_ATTACH defined but NEED_DEV_PM_DOMAIN_DETACH not defined???"
-#endif /* NEED_DEV_PM_DOMAIN_ATTACH */
-#ifdef NEED_DEV_PM_DOMAIN_DETACH
-#error "NEED_DEV_PM_DOMAIN_DETACH defined but NEED_DEV_PM_DOMAIN_ATTACH not defined???"
-#endif /* NEED_DEV_PM_DOMAIN_DETACH */
-#endif /* NEED_DEV_PM_DOMAIN_ATTACH && NEED_DEV_PM_DOMAIN_DETACH */
-
 #ifdef NEED_CPU_LATENCY_QOS_RENAME
 /* NEED_CPU_LATENCY_QOS_RENAME
  *
