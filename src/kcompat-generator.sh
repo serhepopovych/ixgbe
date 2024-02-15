@@ -49,6 +49,7 @@ function gen-device() {
 	gen NEED_DEVM_KASPRINTF if fun devm_kasprintf absent in "$dh"
 	gen NEED_DEVM_KFREE if fun devm_kfree absent in "$dh"
 	gen NEED_DEVM_KVASPRINTF if fun devm_kvasprintf absent in "$dh"
+	gen NEED_DEVM_KMALLOC if fun devm_kmalloc absent in "$dh"
 	gen NEED_DEVM_KZALLOC if fun devm_kzalloc absent in "$dh"
 }
 

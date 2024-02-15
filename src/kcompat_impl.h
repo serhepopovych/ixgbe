@@ -1880,6 +1880,15 @@ static inline void _kc_devm_kfree(struct device *dev, void *p)
 #define devm_kfree _kc_devm_kfree
 #endif /* NEED_DEVM_KFREE */
 
+/* NEED_DEVM_KMALLOC
+ *
+ * devm_kmalloc was introduced in Linux 3.12 as part of commit
+ * 64c862a839a8 ("devres: add kernel standard devm_k.alloc functions")
+ */
+#ifdef NEED_DEVM_KMALLOC
+#define devm_kmalloc(dev, size, flags) kmalloc(size, flags)
+#endif /* NEED_DEVM_KMALLOC */
+
 #ifdef NEED_DEVM_KZALLOC
 #define devm_kzalloc(dev, size, flags) kzalloc(size, flags)
 #endif /* NEED_DEVM_KZALLOC */
