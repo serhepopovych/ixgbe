@@ -1222,6 +1222,15 @@ int _kc_pci_iov_vf_id(struct pci_dev *dev);
 #define pci_iov_vf_id _kc_pci_iov_vf_id
 #endif /* NEED_PCI_IOV_VF_ID */
 
+/* NEED_DIV64_U64_REM
+ *
+ * div64_u64_rem was introduced in Linux 3.12 as part of commit
+ * eb18cba78c2b ("math64: New separate div64_u64_rem helper")
+ */
+#ifdef NEED_DIV64_U64_REM
+u64 div64_u64_rem(u64 dividend, u64 divisor, u64 *remainder);
+#endif /* NEED_DIV64_U64_REM */
+
 /* NEED_MUL_U64_U64_DIV_U64
  *
  * mul_u64_u64_div_u64 was introduced in Linux 5.9 as part of commit

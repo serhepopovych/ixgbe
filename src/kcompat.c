@@ -2984,6 +2984,41 @@ int _kc_pci_iov_vf_id(struct pci_dev *dev)
 #endif /* CONFIG_PCI_IOV */
 #endif /* NEED_PCI_IOV_VF_ID */
 
+#ifdef NEED_DIV64_U64_REM
+u64 div64_u64_rem(u64 dividend, u64 divisor, u64 *remainder)
+{
+#if BITS_PER_LONG == 64
+	*remainder = dividend % divisor;
+	return dividend / divisor;
+#elif BITS_PER_LONG == 32
+	u32 high = divisor >> 32;
+	u64 quot;
+
+	if (high == 0) {
+		u32 rem32;
+		quot = div_u64_rem(dividend, divisor, &rem32);
+		*remainder = rem32;
+	} else {
+		int n = fls(high);
+		quot = div_u64(dividend >> n, divisor >> n);
+
+		if (quot != 0)
+			quot--;
+
+		*remainder = dividend - quot * divisor;
+		if (*remainder >= divisor) {
+			quot++;
+			*remainder -= divisor;
+		}
+	}
+
+	return quot;
+#else /* BITS_PER_LONG == ?? */
+# error div64_u64_rem() does not yet support the C64
+#endif /* BITS_PER_LONG == 32 */
+}
+#endif /* NEED_DIV64_U64_REM */
+
 #ifdef NEED_MUL_U64_U64_DIV_U64
 u64 mul_u64_u64_div_u64(u64 a, u64 b, u64 c)
 {
